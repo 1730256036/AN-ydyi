@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AN-ydyi</title>
+<!-- PWA（2026-09-15）：可安装到桌面/手机，脱离浏览器地址栏独立窗口运行。
+     注意：本项目「离线」= 不依赖互联网（三方资源全在本地），仍由 node server.mjs 供页面；
+     SW 只做外壳缓存，见 sw.js 顶部说明。 -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#0e1116">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AN-ydyi">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<style>
+  /* ============================================================
+     克制极简·深色高冷风：深炭底 + 冷白文字 + 单一冷强调色
+     画布默认(音高球)为与特效模板同族的深底(见 --stage)。
+     JS 依赖的 id 与 class(active/hidden/rec-stop/on/play)全部保留。
+     ============================================================ */
+  :root {
+    --bg:        #0e1116;      /* 页面深炭 */
+    --surface:   #151a21;      /* 面板/卡片(略亮于底) */
+    --hair:      rgba(220,230,240,.09);
+    --hair-strong: rgba(220,230,240,.18);
+    --ink:       #e6e9ee;      /* 冷白正文 */
+    --ink-dim:   #9aa3ae;      /* 次级 */
+    --ink-faint: #6b7480;      /* 弱/标签 */
+    --accent:    #7dd3fc;      /* 单一强调 冷淡青(呼应特效 cyan) */
+    --accent-ink:#08121a;
+    --accent-soft: rgba(125,211,252,.12);
+    --rec:       #f87171;      /* 录音中(亮红,仅关键动作) */
+    --rec-soft:  rgba(248,113,113,.12);
+    --good:      #4ade80;      /* 已测得音(低调绿点缀) */
+    --ok:        #67e8f9;
+    --stage:     #0b0f14;      /* 画布舞台深底 = 特效模板同族 */
+    --rad:       6px;
+    --shadow:    0 1px 2px rgba(0,0,0,.35), 0 6px 22px rgba(0,0,0,.30);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    overflow: hidden; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+  .grow { flex: 1; }
+
+  /* ---------- 顶栏：极简一行，分隔线下 1px ---------- */
+  header {
+    display: flex; align-items: center; gap: 20px;
+    padding: 14px 22px 12px; background: var(--bg);
+  }
+  .brand { display: flex; align-items: baseline; gap: 8px; user-select: none; }
+  .brand .word { font-size: 15px; font-weight: 650; letter-spacing: .14em; color: var(--ink); }
+  .brand .word em { font-style: normal; color: var(--ink-faint); font-weight: 500; letter-spacing: .02em; }
+  .brand .mark { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); align-self: center; }
+
+  /* 模式：安静的文字切换，仅选中项下方一点强调 */
+  .modes { display: flex; gap: 2px; }
+  .modes button {
+    border: none; background: transparent; color: var(--ink-dim);
+    padding: 5px 4px; margin: 0 8px; font-size: 13px; cursor: pointer;
+    position: relative; transition: color .15s;
+  }
+  .modes button:hover { color: var(--ink); }
+  .modes button.active { color: var(--ink); font-weight: 600; }
+  /* 未实现的三档（2026-09-16）：只作占位，不给"能点能改"的假象 */
+  .modes button:disabled { opacity: .4; cursor: not-allowed; }
+  .modes button.active::after {
+    content: ""; position: absolute; left: 4px; right: 4px; bottom: -2px; height: 2px;
+    background: var(--accent); border-radius: 1px;
+  }
+
+  /* 主读数：白底微卡片，细体大数字，唯一焦点 */
+  .readout { display: flex; align-items: center; gap: 16px; padding: 7px 18px; background: var(--surface);
+    border: 1px solid var(--hair); border-radius: 10px; box-shadow: var(--shadow); user-select: none; }
+  .note-big {
+    font-size: 40px; font-weight: 300; line-height: 1; min-width: 96px; text-align: right;
+    color: var(--ink); letter-spacing: .01em; font-variant-numeric: tabular-nums;
+  }
+  .cents { font-size: 12px; color: var(--ink-dim); min-width: 70px; font-variant-numeric: tabular-nums; }
+  .cents .sharp { color: var(--accent); font-weight: 600; }
+  .cents .flat { color: var(--ink-dim); }
+  .hz { font-size: 12px; color: var(--ink-faint); min-width: 72px; font-variant-numeric: tabular-nums; }
+
+  /* ---------- 传输条 ---------- */
+  .recbar {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 9px 22px; background: var(--surface); border-top: 1px solid var(--hair);
+    border-bottom: 1px solid var(--hair);
+  }
+  #liveCtrls, #playCtrls, .side-cluster, .rate-cluster { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* 分组：左侧细竖条，冷调区分录音机/播放器两形态 */
+  #liveCtrls { padding-left: 12px; border-left: 2px solid var(--ink-faint); }
+  #playCtrls { padding-left: 12px; border-left: 2px solid var(--accent); }
+
+  /* 录音主按钮：常态=细描边; 录制中=实心红(关键语义) */
+  .btn-rec {
+    border: 1px solid var(--hair-strong); background: var(--surface); color: var(--ink);
+    border-radius: var(--rad); cursor: pointer; padding: 7px 16px;
+    font-size: 13px; font-weight: 600; transition: all .15s;
+  }
+  .btn-rec:hover { border-color: var(--ink); }
+  .btn-rec.rec-stop { background: var(--rec); border-color: var(--rec); color: #fff; }
+
+  .rec-clock { font-variant-numeric: tabular-nums; color: var(--ink-faint); font-size: 14px; font-weight: 500;
+    min-width: 84px; letter-spacing: .03em; }
+  .rec-clock.on { color: var(--rec); font-weight: 700; }
+
+  .recbar label.q, .recbar label.auto { display: inline-flex; align-items: center; gap: 5px; color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
+  .recbar label.auto { cursor: pointer; }
+  .recbar select {
+    background: var(--surface); color: var(--ink); border: 1px solid var(--hair);
+    padding: 4px 6px; border-radius: 5px; font-size: 12px; outline: none;
+  }
+
+  /* 播放主按钮：常态=细描边; 进入播放态=冷强调实心 */
+  .btn-play {
+    border: 1px solid var(--hair-strong); border-radius: var(--rad); cursor: pointer;
+    background: var(--surface); color: var(--ink); padding: 7px 16px; font-size: 13px; font-weight: 600;
+    transition: all .15s; min-width: 92px;
+  }
+  .btn-play:hover { border-color: var(--ink-dim); }
+  .btn-play.play { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn-mini {
+    border: 1px solid var(--hair); background: transparent; color: var(--ink-dim);
+    padding: 5px 12px; border-radius: var(--rad); font-size: 12px; cursor: pointer;
+    transition: all .15s; white-space: nowrap;
+  }
+  .btn-mini:hover { color: var(--ink); border-color: var(--hair-strong); background: var(--surface); }
+  .btn-mini.accent { color: var(--accent); border-color: rgba(125,211,252,.4); }
+
+  .clip-name { color: var(--ink); font-weight: 600; font-size: 12px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-time { color: var(--ink-faint); font-variant-numeric: tabular-nums; font-size: 12px; min-width: 30px; text-align: center; }
+  #pSeek { flex: 1; min-width: 110px; max-width: 240px; accent-color: var(--accent); cursor: pointer; height: 4px; }
+
+  /* 次级信息靠右，安静小字 */
+  .side-cluster { gap: 18px; margin-left: auto; }
+  .sens { display: flex; align-items: center; gap: 8px; }
+  .sens .slab { font-size: 11px; color: var(--ink-faint); }
+  .sens .sval { font-size: 12px; color: var(--accent); font-weight: 600; min-width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+  .sens .sTrack { position: relative; display: flex; align-items: center; }
+  .sens input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 96px; height: 3px; border-radius: 2px;
+    background: #2a303a; outline: none; cursor: pointer;
+  }
+  .sens input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent);
+    border: 2px solid #151a21; cursor: pointer; box-shadow: 0 0 0 1px var(--hair-strong);
+  }
+  .sens input[type=range]:disabled { opacity: .35; cursor: not-allowed; }
+  .kernsel {
+    max-width: 118px; font-size: 11px; color: var(--ink); background: #151a21;
+    border: 1px solid var(--hair-strong); border-radius: 5px; padding: 3px 4px; outline: none; cursor: pointer;
+  }
+  .sens .hint {
+    position: absolute; top: 100%; right: 0; margin-top: 3px; font-size: 9px; color: var(--ink-faint);
+    white-space: nowrap; background: var(--surface); border: 1px solid var(--hair); border-radius: 5px;
+    padding: 2px 6px; pointer-events: none; opacity: 0; transition: opacity .12s; z-index: 6;
+  }
+  .sens .sTrack:hover .hint, .sens input:focus ~ .hint { opacity: 1; }
+  .stat { font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+  .stat b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat .hi { color: var(--ink); }
+
+  #recStatus { flex: 1 1 100%; color: var(--ink-faint); font-size: 11px; padding: 3px 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #recStatus:empty { display: none; }
+  #projStatus { flex: 0 0 auto; color: var(--ok); font-size: 11px; padding: 0 2px; white-space: nowrap; }
+  #projStatus:empty { display: none; }
+  #projStatus.busy { color: var(--accent); }
+
+  /* 工程存档面板：主区右下角浮层 */
+  .proj-panel {
+    position: fixed; right: 18px; bottom: 54px; z-index: 40;
+    width: min(520px, calc(100vw - 36px));
+    background: var(--surface); border: 1px solid var(--hair-strong);
+    border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px;
+  }
+  .proj-panel.hidden { display: none; }
+  .pp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .pp-head b { font-size: 13px; color: var(--ink); }
+  .pp-btns { display: flex; gap: 8px; margin-bottom: 8px; }
+  .pp-search {
+    width: 100%; box-sizing: border-box; margin-bottom: 8px;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--hair);
+    border-radius: 6px; padding: 4px 8px; font-size: 12px; outline: none;
+  }
+  .pp-search:focus { border-color: var(--accent); }
+  /* 分类 tab：点只看这一类 */
+  .pp-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .pp-tabs .pp-tab { padding: 2px 9px; }
+  .pp-tabs .pp-tab.on {
+    color: var(--accent-ink); background: var(--accent);
+    border-color: var(--accent); font-weight: 500;
+  }
+  .pp-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+  .pp-empty { color: var(--ink-faint); font-size: 12px; padding: 8px 2px; line-height: 1.6; }
+  .pp-item {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--hair); border-radius: 7px; padding: 6px 8px; font-size: 12px;
+  }
+  .pp-item.cur { border-color: var(--accent); }
+  .pp-badge {
+    flex: 0 0 auto; font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    border: 1px solid currentColor; white-space: nowrap;
+  }
+  .pp-badge.midi  { color: var(--accent); }
+  .pp-badge.audio { color: var(--ink-dim); }
+  .pp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .pp-item .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); cursor: pointer; }
+  .pp-item .nm:hover { color: var(--accent); }
+  .pp-item .meta { color: var(--ink-faint); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-item button { padding: 2px 8px; }
+  .pp-foot { margin-top: 8px; color: var(--ink-faint); font-size: 10px; line-height: 1.5; }
+
+  /* 调试日志面板：等宽小字，级别着色 */
+  .lp-filters { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .lp-count { margin-left: auto; color: var(--ink-faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+  .lp-list { font-family: Consolas, "Courier New", monospace; font-size: 11px; line-height: 1.5; }
+  .lp-row { padding: 2px 4px; border-bottom: 1px solid var(--hair); word-break: break-all; white-space: pre-wrap; }
+  .lp-row .t { color: var(--ink-faint); }
+  .lp-row .lv { font-weight: 700; }
+  .lp-row.lv-ERROR .lv, .lp-row.lv-ERROR { color: var(--rec); }
+  .lp-row.lv-WARN .lv, .lp-row.lv-WARN { color: #fbbf24; }
+  .lp-row.lv-DEBUG { color: var(--ink-faint); }
+  .lp-row .cat { color: var(--accent); }
+  .lp-row .d { color: var(--ink-dim); }
+
+  /* ---------- 主区：画布(默认音高球为深底舞台) ---------- */
+  main { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .canvas-wrap { position: relative; flex: 1; min-height: 0; background: var(--stage); }
+  canvas#pitchCanvas { width: 100%; height: 100%; display: block; }
+  /* WebGL 模板专用画布(3D 钢琴等)：与 2D 画布互斥显隐，由 app.mjs 控制 */
+  canvas#pitchCanvasGL {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    display: none; z-index: 1; touch-action: none;
+  }
+
+  .badge { position: absolute; right: 22px; top: 18px; font-size: 10px; color: var(--ink-faint); font-variant-numeric: tabular-nums; pointer-events: none; z-index: 2; }
+
+  /* 动画模板工具条：白色细边框胶囊群，顶部悬浮 */
+  .anim-bar {
+    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 1px; align-items: center; flex-wrap: wrap; justify-content: center;
+    background: var(--surface); border: 1px solid var(--hair); border-radius: var(--rad);
+    padding: 3px; box-shadow: var(--shadow); z-index: 5; max-width: 96%;
+  }
+  .anim-btn {
+    border: none; background: transparent; color: var(--ink-faint); padding: 5px 12px; border-radius: 4px;
+    font-size: 12px; cursor: pointer; transition: all .12s; white-space: nowrap;
+  }
+  .anim-btn:hover { color: var(--ink); background: var(--surface); }
+  .anim-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  /* ---------- 引导蒙层：深底极简 ---------- */
+  #overlay {
+    position: fixed; inset: 0; background: rgba(14,17,22,.96); z-index: 50;
+    display: flex; align-items: center; justify-content: center; flex-direction: column;
+    gap: 22px; text-align: center; padding: 34px;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 { font-size: 34px; font-weight: 300; letter-spacing: .06em; color: var(--ink); }
+  #overlay h1 b { color: var(--accent); font-weight: 500; }
+  #overlay p { color: var(--ink-dim); max-width: 470px; line-height: 1.9; font-size: 14px; }
+  .err { color: var(--rec) !important; }
+  .btn {
+    border: 1px solid var(--hair-strong); background: var(--surface); color: var(--ink);
+    padding: 11px 34px; border-radius: var(--rad);
+    font-size: 15px; font-weight: 500; cursor: pointer; transition: all .15s; letter-spacing:.02em;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--ink-dim); font-size: 13px; }
+  .btn.ghost:hover { color: var(--accent); }
+  .ov-btns { display: flex; gap: 14px; align-items: center; }
+  .hint-chip { font-size: 12px; color: var(--ink-faint); }
+
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ---------- 纯净模式（2026-09-15）：隐藏全部界面，只留画布 ----------
+     用途：看动画不被打扰 + 录屏导出「纯洁的动画」（canvas 录不到 DOM 覆盖层，
+     这里是把 DOM 也一并收掉，两边口径一致）。
+     进入=浏览器全屏 + body.pure；退出=Esc / 退出按钮 / 全屏被外部结束。
+     ⚠️ 这份 CSS 就是隐藏清单的**唯一真相源**（app/capture.mjs 只管状态与全屏）：
+        新增界面元素若要一并隐藏，加进下面的选择器即可，JS 不用改。
+        .lib-panel 是 app/library.mjs 动态建在 document.body 上的曲库浮层（不是 #app 的子节点、
+        也不带 .proj-panel 类）—— 漏了它纯净模式就会"漏画面"（2026-09-16 修）。 */
+  body.pure header,
+  body.pure .recbar,
+  body.pure .proj-panel,
+  body.pure .anim-bar,
+  body.pure .badge,
+  body.pure .lib-panel { display: none !important; }
+  #app:fullscreen { background: var(--stage); }
+  #app:-webkit-full-screen { background: var(--stage); }
+
+  /* 纯净模式悬浮控制条：鼠标不动就淡出，避免出现在录屏里 */
+  #pureBar {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--hair-strong); border-radius: 999px;
+    padding: 5px 8px 5px 14px; box-shadow: var(--shadow); z-index: 60;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  #pureBar.shown { opacity: 1; pointer-events: auto; }
+  #pureBar.hidden { display: none; }
+  #pureBar .pb-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rec); display: none; }
+  #pureBar.rec .pb-dot { display: block; animation: pbpulse 1.1s infinite; }
+  #pureBar .pb-hint { color: var(--ink-faint); font-size: 11px; white-space: nowrap; }
+  #pureBar .pb-clock { color: var(--ink-dim); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 54px; }
+  #pureBar .pb-clock.on { color: var(--rec); font-weight: 600; }
+  @keyframes pbpulse { 0%, 100% { opacity: 1 } 50% { opacity: .2 } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">
+      <span class="word">AN-ydyi</span>
+      <span class="mark"></span>
+    </div>
+    <div class="modes" id="modeSwitch">
+      <!-- ⚠ 2026-09-16：三档仍是占位（全工程无 mode 消费点，改了不影响检测）。
+           为了不再"看着能切、切了没用"，一律 disabled 并把原因写在 title 上；
+           真要落地需按档位改写 CFG.fmin/fmax 与门控参数，且必须用户实测校准。 -->
+      <button data-mode="auto" class="active" disabled title="音区档位尚未实现：当前对检测无影响（用「灵敏」「收音」调档）">自动</button>
+      <button data-mode="whistle" disabled title="音区档位尚未实现：当前对检测无影响（用「灵敏」「收音」调档）">口哨</button>
+      <button data-mode="voice" disabled title="音区档位尚未实现：当前对检测无影响（用「灵敏」「收音」调档）">人声</button>
+    </div>
+    <div class="grow"></div>
+    <div class="readout">
+      <span class="note-big" id="noteDisplay">--</span>
+      <span class="cents" id="centsDisplay"></span>
+      <span class="hz" id="hzDisplay"></span>
+    </div>
+  </header>
+
+  <!-- 统一传输条：录音机(实时检测+录音) 与 播放器 两簇，setView 切换显隐 -->
+  <div class="recbar">
+    <!-- 录音机簇：主按钮(开始/暂停/继续) + 试听 + 停止保存，状态只换文字不挪位置 -->
+    <div id="liveCtrls">
+      <button class="btn-rec" id="btnRec">● 开始录音</button>
+      <button class="btn-mini accent" id="btnAud" style="display:none" title="试听已录内容，随时可回到原处继续录音">⏯ 试听</button>
+      <button class="btn-mini" id="btnSaveRec" style="display:none" title="停止并保存当前录音">■ 停止并保存</button>
+      <span class="rec-clock" id="recClock">00:00.0</span>
+      <input type="range" id="recSeek" min="0" max="1000" step="1" value="0" style="display:none;flex:0 0 160px;max-width:200px" title="拖动走带(暂停=查看曲线/试听=选播放位置)"><span class="p-time" id="recSeekT" style="display:none">0:00/0:00</span>
+      <label class="q">音质
+        <select id="recQ" title="录音质量">
+          <option value="std">标准</option>
+          <option value="high" selected>高清</option>
+          <option value="loss">高保真</option>
+        </select>
+      </label>
+      <button class="btn-mini" id="btnCalib" title="安静环境下重新测定底噪，自动收音门槛将跟随它">⌁ 校准底噪</button>
+    </div>
+    <!-- 播放器簇：仅导入/归档回放用 -->
+    <div id="playCtrls">
+      <button class="btn-play" id="btnPP">▶ 播放</button>
+      <button class="btn-mini" id="btnReplay" title="从头重播">↺ 重播</button>
+      <span class="clip-name" id="clipName"></span>
+      <span class="p-time" id="pCur">0:00</span>
+      <input type="range" id="pSeek" min="0" max="1000" step="1" value="0" title="拖动时间线">
+      <span class="p-time" id="pTot">0:00</span>
+      <button class="btn-mini accent" id="btnNew" title="回到实时录音">＋ 新建</button>
+      <button class="btn-mini" id="btnExport" title="导出此段为音频文件">⭳ 导出音频</button>
+      <!-- 存MIDI / AI转谱（2026-09-19 从钢琴块模板面板搬来）：它们操作的是**当前工程**
+           （导出音符 / 音频转音符），与选了哪个动画模板无关，故属主界面。
+           AI转谱的显隐由 app.mjs 的 syncAnimBarDeps 按"有没有可转谱的真实音频"补刷。 -->
+      <button class="btn-mini" id="btnSaveMidi" title="把当前工程音符导出为 .mid 文件(MIDI工程直出；音频工程用检测分段)">存MIDI</button>
+      <button class="btn-mini" id="btnAiTrans" style="display:none" title="实验功能：Basic Pitch 本地推理(模型已内置 vendor/，无需联网)，把当前音频转成复调音符">AI转谱</button>
+      <select id="rvcModel" title="RVC 音色模型（需本地变声桥，未配置时此控件隐藏）" style="max-width:130px;display:none"></select>
+      <select id="rvcIndex" title="特征检索索引（影响音色相似度，与音高无关；无索引时自动跳过检索）" style="max-width:130px;display:none"></select>
+      <input type="number" id="rvcIdxRate" value="0.5" min="0" max="1" step="0.05" title="检索特征占比（0=不用检索）" style="width:52px;display:none">
+      <input type="number" id="rvcKey" value="0" min="-12" max="12" step="1" title="变调（半音，正=升调）。男转女一般填 +12（范围 8~12），女转男一般填 -12（范围 -12~-8），只换音色不变调填 0" style="width:56px;display:none">
+      <button class="btn-mini accent" id="btnRvc" style="display:none" title="将当前工程音频用 RVC 转换音色，并自动重新分析音高。注意：样本是当前音频——已变过一次再点会叠加变声（级联），要回到原始请先点「↩ 还原」">变声</button>
+      <button class="btn-mini" id="btnRvcRestore" style="display:none" title="还原为变声前的原始音频（同样重新分析）">↩ 还原</button>
+    </div>
+    <!-- 倍速簇：播放器视图与录音试听**共用一份**（故意不放进 #liveCtrls/#playCtrls——
+         那两个 div 是 setView 互斥显隐的，放里面就得维护两份控件与两份状态）。
+         显隐由 app.mjs 的 syncRateUI() 按传输态决定（播放视图 / 暂停 / 试听才出现）。
+         ⚠ 档位清单必须与 app/player.mjs 的 RATES 一致（未知值会被回退成 1×）。 -->
+    <div class="rate-cluster" id="rateCluster" style="display:none">
+      <label class="q">倍速
+        <select id="playRate" title="播放倍速 0.25×~4×。默认「变速不变调」：慢放只变慢、音高不动，适合听细节；勾上「变调」则是磁带式，音高跟着一起变（0.5× 低八度、2× 高八度）">
+          <option value="0.25">0.25×</option>
+          <option value="0.5">0.5×</option>
+          <option value="0.75">0.75×</option>
+          <option value="1" selected>1×</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2×</option>
+          <option value="3">3×</option>
+          <option value="4">4×</option>
+        </select>
+      </label>
+      <label class="q" id="playTapeWrap" title="勾上=磁带式变速，音高跟倍速一起变（0.5× 低八度）。不勾=变速不变调（默认，慢放练耳用这个）。MIDI 工程/无音频存档的声音是合成琴声，变调对它无效，故不显示这个开关">
+        <input type="checkbox" id="playTape"> 变调
+      </label>
+    </div>
+    <div class="side-cluster">
+      <div class="stat">已测 <b id="lowStat">--</b><span> – </span><b class="hi" id="highStat">--</b></div>
+      <label class="sens" title="音高检测算法：切换后实时立即生效，已分析工程曲线会按新算法重算">
+        <span class="slab">检测</span>
+        <select id="kernelSel" class="kernsel"></select>
+      </label>
+      <div class="sens">
+        <span class="slab">灵敏</span>
+        <span class="sval" id="sensVal"></span>
+        <span class="sTrack"><input type="range" id="sensSlider" min="0" max="100" step="1"><span class="hint" id="sensHint"></span></span>
+      </div>
+      <div class="sens">
+        <span class="slab">收音</span>
+        <span class="sval" id="dbVal"></span>
+        <span class="sTrack"><input type="range" id="dbSlider" min="20" max="70" step="1"><span class="hint" id="dbHint"></span></span>
+      </div>
+      <label class="auto" title="跟随环境噪声自动校准；取消勾选后可手动设定收音门槛"><input type="checkbox" id="autoDb" checked> 自动</label>
+      <!-- 导入即播：管的是「导入音频」按钮的行为，故跟导入按钮同簇（放在录音簇里会，
+           导致播放视图看不见它、导入却仍受它支配 —— 2026-09-16 归位）。 -->
+      <label class="auto" title="勾上=导入音频 / 导入 MIDI（含曲库点歌）后立即自动播放；取消则停在播放视图等手动点播放。打开存档不自动播放（先让你看整段曲线）"><input type="checkbox" id="autoPlayOnImport" checked> 导入即播</label>
+      <button class="btn-mini" id="btnImport">导入音频</button>
+      <input type="file" id="fileAudio" accept="audio/*,.wav,.mp3,.ogg,.m4a,.webm" style="display:none">
+      <button class="btn-mini" id="btnImportMidi" title="导入 MIDI 文件，钢琴块模式下观看自动弹奏(无需音频)">导入 MIDI</button>
+      <input type="file" id="fileMidi" accept=".mid,.midi,audio/midi" style="display:none">
+      <button class="btn-mini" id="btnRecord" title="把当前动画录成视频：画面只含画布动画(不含任何界面/读数)，声音含琴声与播放音频；正在录音时还会并入你的麦克风">⏺ 录制动画</button>
+      <button class="btn-mini" id="btnPure" title="纯净全屏：隐藏菜单栏与全部读数，只留动画画面（Esc 退出）">⛶ 纯净全屏</button>
+      <button class="btn-mini" id="btnProjList" title="我的存档：录音 / 导入的音频 / MIDI 都自动存在这里，随时点开重看重听">📚 存档</button>
+      <input type="file" id="fileYdyi" accept=".ydyi,application/json" style="display:none">
+      <button class="btn-mini" id="btnLog" title="打开调试日志面板（录音/分析/导入等全程记录，可导出给开发者排查）">日志</button>
+    </div>
+    <span id="projStatus"></span>
+    <span id="recStatus"></span>
+  </div>
+
+  <!-- 工程存档面板 -->
+  <div class="proj-panel hidden" id="projPanel">
+    <div class="pp-head"><b>我的存档</b><button class="btn-mini" id="ppClose">✕</button></div>
+    <div class="pp-btns">
+      <button class="btn-mini accent" id="ppSaveCur" title="把当前正在看/听的内容存成一条档案">⭱ 存当前</button>
+      <button class="btn-mini" id="ppImportY" title="从 .ydyi 存档文件导入一条工程（可含音频）">导入存档工程(.ydyi)</button>
+      <button class="btn-mini" id="ppExportY" title="把当前内容导出为 .ydyi 存档文件（可含音频），可拷到别的电脑">导出当前存档工程</button>
+    </div>
+    <input type="search" class="pp-search" id="ppSearch" placeholder="搜索存档名…">
+    <div class="pp-tabs" id="ppTabs"></div>
+    <div class="pp-list" id="ppList"><span class="pp-empty">还没有存档。</span></div>
+    <div class="pp-foot" id="ppFoot"></div>
+  </div>
+
+  <!-- 调试日志面板：录音/分析/导入全程记录，出问题导出给开发者排查 -->
+  <div class="proj-panel hidden" id="logPanel">
+    <div class="pp-head"><b>调试日志</b><button class="btn-mini" id="lpClose">✕</button></div>
+    <div class="pp-btns">
+      <button class="btn-mini accent" id="lpExport" title="导出全部日志为文本文件（含摘要），发给开发者即可定位问题">导出 .log</button>
+      <button class="btn-mini" id="lpClear" title="清空全部日志（含历史会话）">清空</button>
+      <label class="auto" style="margin-left:auto" title="自动滚动到最新一条"><input type="checkbox" id="lpFollow" checked> 跟随</label>
+    </div>
+    <div class="lp-filters">
+      <label class="auto"><input type="radio" name="lpLevel" value="" checked> 全部</label>
+      <label class="auto"><input type="radio" name="lpLevel" value="WARN"> 警告以上</label>
+      <label class="auto"><input type="radio" name="lpLevel" value="ERROR"> 仅错误</label>
+      <span class="lp-count" id="lpCount"></span>
+    </div>
+    <div class="pp-list lp-list" id="lpList"></div>
+  </div>
+
+  <!-- 纯净模式悬浮控制条：默认隐藏，进纯净模式才出现；鼠标静止约 2.5s 自动淡出，
+       保证它不会被录进视频（录制中除外——录制时要一直能看到"停止"）。
+       ⚠️ 必须放在 #app 内部：全屏元素是 #app，全屏时只有它子树里的东西会被渲染，
+       放在外面会导致全屏后点不到退出/停止。 -->
+  <div id="pureBar" class="hidden">
+    <span class="pb-dot"></span>
+    <span class="pb-hint" id="pbHint">纯净模式 · Esc 退出</span>
+    <span class="pb-clock" id="pbClock">00:00</span>
+    <button class="btn-mini" id="pbRec" title="录制这段动画为视频（画面只有动画，不含界面）">⏺ 录制</button>
+    <button class="btn-mini" id="pbExit" title="退出纯净模式（等同 Esc）">⛶ 退出</button>
+  </div>
+
+  <main>
+    <div class="canvas-wrap">
+      <canvas id="pitchCanvas"></canvas>
+      <canvas id="pitchCanvasGL"></canvas>
+      <div class="anim-bar" id="animBar"></div>
+      <div class="badge" id="fpsBadge"></div>
+    </div>
+  </main>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./node_modules/three/build/three.module.js",
+    "three/addons/": "./node_modules/three/examples/jsm/",
+    "spessasynth_lib": "./node_modules/spessasynth_lib/dist/index.js",
+    "spessasynth_core": "./node_modules/spessasynth_core/dist/index.js",
+    "stb-vorbis": "./node_modules/stb-vorbis/dist/index.js"
+  }
+}
+</script>
+
+<div id="overlay">
+  <h1><b>AN-ydyi</b></h1>
+  <p>对着麦克风吹口哨、哼唱或发声，实时检测音高并驱动动画。<br>
+  点"开始录音"即边检测边录成一段，点"停止并保存"即可回放试听并重测音高动画；<br>
+  也可直接"导入音频"，像播放器一样播放/暂停/拖动时间线分析。</p>
+  <p class="hint-chip">首次会请求麦克风权限，请允许。建议用手机耳机麦或独立麦，高频更准。</p>
+  <div class="ov-btns">
+    <button class="btn" id="btnPermit">● 开始录音</button>
+    <button class="btn ghost" id="btnSkipPermit" title="不申请麦克风，先直接看看界面；之后随时点「● 开始录音」，或用「导入音频」直接分析已有文件">先不录音，直接进入</button>
+  </div>
+</div>
+
+<script src="./vendor/tfjs/tf.min.js"></script><!-- AI转谱用 tfjs(UMD→window.tf)，全本地 -->
+<script src="./node_modules/onnxruntime-web/dist/ort.all.min.js"></script><!-- SwiftF0 用 onnxruntime-web(UMD→window.ort)，wasm 同目录 node_modules 本地 -->
+<script type="module" src="./app.mjs"></script>
+</body>
+</html>

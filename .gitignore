@@ -1,0 +1,43 @@
+# 依赖
+node_modules/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 音频：只放行内置示范曲（曲库功能依赖它们），其余音频一律不入库
+*.mid
+!demo/*.mid
+
+# 第三方资产：默认整体不入库，再按白名单逐项放行。
+# basic-pitch 放行的是打了本地化补丁的 4 个源文件与其模型权重；
+# tfjs 与 SwiftF0 的模型/运行时是 AI 转谱与 SwiftF0 内核开箱即用所必需。
+vendor/*
+!vendor/basic-pitch
+vendor/basic-pitch/*
+!vendor/basic-pitch/index.js
+!vendor/basic-pitch/inference.js
+!vendor/basic-pitch/matchers.js
+!vendor/basic-pitch/toMidi.js
+!vendor/basic-pitch/model
+!vendor/tfjs
+vendor/tfjs/*
+!vendor/tfjs/tf.min.js
+!vendor/swiftf0
+vendor/swiftf0/*
+!vendor/swiftf0/model.onnx
+!vendor/spessasynth
+vendor/spessasynth/*
+!vendor/spessasynth/spessasynth_processor.min.js
+!vendor/soundfonts
+
+# 本地素材与导出：运行时或调试产生，不入库
+*.wav
+samples/
+logs/
+archives/
+*.webm
+live-debug*.json
+
+# 日志导出
+*.log

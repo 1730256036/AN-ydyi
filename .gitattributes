@@ -1,0 +1,3 @@
+# 行尾策略：仓库内统一存 LF，Windows 检出时自动转 CRLF。
+# 跟着仓库走，不依赖每个人本机的 core.autocrlf 设置。
+* text=auto
