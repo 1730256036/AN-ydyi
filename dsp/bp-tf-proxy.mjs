@@ -5,7 +5,8 @@
 // inference.js 里的 import 已 sed 指向本模块，按需转发到 window.tf。
 // 导出清单 = grep -oh "tf\.[a-zA-Z0-9_]*" vendor/basic-pitch/*.js 的并集
 // (注意带数字的 API 如 concat1d，正则漏数字会踩 "not a function")。
-// vendor/ 大文件不进 git(.gitignore)，恢复命令见 app.mjs aiTranscribe 注释。
+// basic-pitch 的补丁源文件/模型权重与 tfjs 均已入库（.gitignore 白名单放行），clone 即可用；
+// 万一被删，恢复命令见 app.mjs 中 aiTranscribe 上方的注释。
 // ============================================================
 const tf = () => window.tf;
 

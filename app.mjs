@@ -1252,8 +1252,9 @@ function importMidiNotes(notes, name, { archive = true } = {}) {
 //   - 工具条上的「曲库」按钮调 toggleLibPanel()
 
 // ===== AI 转谱：Spotify Basic Pitch 浏览器推理，音频→复调音符事件 =====
-// 全本地：tfjs(UMD) 与 basic-pitch esm/model 均在 vendor/ 下(.gitignore，可重下)。
-// 恢复命令：
+// 全本地：tfjs(UMD) 与 basic-pitch 的补丁源文件/模型权重均已入库（.gitignore 白名单放行），
+// clone 后开箱即用，不需要 npm install。
+// 万一这几个文件被删，用下面的命令按原版本从 CDN 重下：
 //   mkdir -p vendor/tfjs vendor/basic-pitch/model
 //   curl -sL -o vendor/tfjs/tf.min.js https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js
 //   curl -sL -o vendor/basic-pitch/model/model.json https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/model/model.json
