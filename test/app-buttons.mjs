@@ -35,7 +35,6 @@ const ALLOW = new Map([
   ['btnPermit', '引导层的"开始录音"：此时已在录音中，startRecording 的 `recState!==idle` 守卫挡下'],
   // 三、效果是异步的，超出本测试 15ms 的观测窗口
   ['btnCalib', '底噪校准要采样 20×40ms≈800ms 才回写状态栏，15ms 窗口内看不到'],
-  ['btnRvcRestore', '没做过变声 → 无原始音频可还原，守卫直接 return'],
   // 四、（「面板关闭类 ppClose/lpClose 点了无反应」两条：给桩补上
   //      "从 index.html 播种 class"之后，#ppPanel/#logPanel 初始就带 .hidden，
   //      这两个"关闭"按钮点击会真的改 classList = 有可观测反应，留着会被反向断言判为腐烂。）

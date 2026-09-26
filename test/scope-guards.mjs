@@ -5,7 +5,7 @@
 // 出现、照样能改"的错配，逐个修完之后把不变量钉在这里，防止日后重构又漂回去：
 //   ① 拒绝麦克风 → 引导蒙层不退 → 全站被 z-index:50 的遮罩锁死
 //   ② 「原声」= 全局播放音量，却藏在钢琴块模板面板里
-//   ③ 变声/导出 在 MIDI 工程（静音时间轴）上照样可用
+//   ③ 导出 在 MIDI 工程（静音时间轴）上照样可用
 //   ④ "AI转谱"按钮的显示条件按构建那一刻定死 → 与当前工程不一致
 //      （2026-09-19 起按钮本体搬进主界面 #playCtrls，显隐机制不变）
 //   ⑤ AI 转谱后曲线类模板拿不到工程帧（数据源被换掉）
@@ -76,8 +76,6 @@ const el = (id) => H.byId(id);
   ck('导入 MIDI：已切到播放器视图', el('playCtrls').style.display !== 'none');
   ck('★MIDI 工程：「导出」置灰（静音时间轴没有声音可导出）',
     el('btnExport').disabled === true, 'disabled=' + String(el('btnExport').disabled));
-  ck('★MIDI 工程：「变声」不出现（原先只看 appView，会把静音编码成 wav 送桥）',
-    el('btnRvc').style.display === 'none', String(el('btnRvc').style.display));
 
   // 「AI转谱」2026-09-19 起在主界面 #playCtrls（与「存MIDI」同批搬出钢琴块面板）：
   // 显隐仍交给 syncAnimBarDeps 按工程补刷——MIDI 工程（静音时间轴）必须隐藏
@@ -199,8 +197,8 @@ const seg = (s, from, to) => {
     && /micFeeding = false;/.test(audioSrc));
   ck('★app.mjs 从 audio 域 import 了 micFeeding', /\bmicFeeding\b/.test(seg(app, "from './app/audio.mjs'", "from './app/anim")));
 
-  // ③ 变声/导出的"真实音频"判据用 clip.silent 标记
-  ck('★变声控件显隐含 !curClip.silent', /showRvc = appView === 'play' && !!curClip && !curClip\.silent/.test(app));
+  // ③ 导出的"真实音频"判据用 clip.silent 标记
+  ck('★导出置灰判据含 !curClip.silent', /const silent = appView === 'play' && !!curClip && !!curClip\.silent;/.test(app));
   ck('★silent 标记在造静音时间轴的两处都打上了',
     (app.match(/silent: true/g) || []).length >= 2, String((app.match(/silent: true/g) || []).length));
 

@@ -1578,20 +1578,6 @@ function updateTransportUI() {
   syncRateUI();
   // 录音态变了 → 钢琴块面板里"录音中才显示"的控件（回声/落速）跟着显隐
   try { syncAnimBarDeps(); } catch (e) {}
-  // RVC 变声控件：播放视图 **且有真实音频** 才显示（2026-09-16 修）。
-  // 只看 appView==='play' 不够 → MIDI 工程 / 纯曲线存档（buffer 是新建的静音时间轴）
-  // 也照样显示变声/模型/索引/key，点下去是把静音编码成 wav 送给本地桥，结果毫无意义。
-  const showRvc = appView === 'play' && !!curClip && !curClip.silent;
-  const rvcSel = el('rvcModel'), rvcKeyEl = el('rvcKey'), rvcBtn = el('btnRvc');
-  const rvcIdxEl = el('rvcIndex'), rvcRateEl = el('rvcIdxRate');
-  const rvcVisible = showRvc && rvcReady;
-  if (rvcSel) rvcSel.style.display = rvcVisible ? '' : 'none';
-  if (rvcIdxEl) rvcIdxEl.style.display = rvcVisible ? '' : 'none';
-  if (rvcRateEl) rvcRateEl.style.display = rvcVisible ? '' : 'none';
-  if (rvcKeyEl) rvcKeyEl.style.display = rvcVisible ? '' : 'none';
-  if (rvcBtn) rvcBtn.style.display = rvcVisible ? '' : 'none';
-  const rvcRe = el('btnRvcRestore');
-  if (rvcRe) rvcRe.style.display = showRvc && preRvcClip ? '' : 'none';
   // 导出：同一口径 —— 静音时间轴没有声音可导出（点了只会拿到一个静音 wav），置灰并说明
   const bExp = el('btnExport');
   if (bExp) {
@@ -1623,96 +1609,6 @@ function syncRateUI() {
   if (tw) tw.style.display = silent ? 'none' : '';
   if (tc && tc.checked !== pitchTape) tc.checked = pitchTape;
 }
-// ===== RVC 离线变声（可选功能：对接本地桥，默认 127.0.0.1:7865；桥不在本仓库内） =====
-// 录音/导入的音频一键转音色：当前 AudioBuffer 编码 wav POST 给本地桥，
-// 桥调官方 vc_single(GPU) 返回变声 wav → decodeAudioData → loadClip 重走导入
-// 管线（自动整段重分析，曲线/钢琴块/音域统计 = 变声后版本）。
-// 原始音频留在 preRvcClip，「↩ 还原」一键回变声前（同样重走分析）。
-// 桥未启动时按钮自动隐藏，不影响其余功能（桥不在本仓库内，属可选外部依赖）。
-const RVC_PORT = 7865;
-let rvcReady = false, rvcBusy = false, preRvcClip = null;
-let rvcModels = [];          // [{id,name,index,hasIndex}]，index 为该模型自动匹配的默认索引
-const rvcUrl = (p) => `http://127.0.0.1:${RVC_PORT}${p}`;
-async function rvcInit() {
-  const sel = el('rvcModel'), idxSel = el('rvcIndex');
-  if (!sel) return;
-  try {
-    const ctl = new AbortController();
-    const tid = setTimeout(() => ctl.abort(), 2500);   // 桥没启动时别让页面等
-    const r = await fetch(rvcUrl('/models'), { signal: ctl.signal });
-    clearTimeout(tid);
-    const j = await r.json();
-    if (!j.models || !j.models.length) throw new Error('无模型');
-    rvcModels = j.models;
-    sel.innerHTML = rvcModels.map((m) => `<option value="${m.id}">${m.name}</option>`).join('');
-    if (idxSel) {
-      idxSel.innerHTML = '<option value="none">无索引</option>' +
-        (j.indexes || []).map((p) => `<option value="${p}">${p.split('/').slice(-2).join('/')}</option>`).join('');
-      rvcSyncIndex();
-    }
-    rvcReady = true;
-    log.info('rvc', '本地桥就绪', { models: rvcModels.map((m) => m.id), indexes: j.indexes });
-    updateTransportUI();
-  } catch (e) {
-    rvcReady = false;
-    log.info('rvc', '未检测到本地变声桥，相关控件已隐藏', {});
-  }
-}
-// 模型切换时把索引框预选为该模型的自动匹配结果（用户仍可手改成无索引/其他索引）
-function rvcSyncIndex() {
-  const idxSel = el('rvcIndex');
-  if (!idxSel) return;
-  const m = rvcModels.find((x) => x.id === (el('rvcModel') || {}).value);
-  idxSel.value = m && m.index ? m.index : 'none';
-}
-async function rvcConvert() {
-  if (rvcBusy) return;
-  if (!curClip || !curClip.buffer) { setStatus('没有可变声的音频'); return; }
-  if (curClip.silent) { setStatus('这段是静音时间轴（MIDI 工程/无音频存档），没有声音可变声——请先录音或导入音频'); return; }
-  const model = el('rvcModel') && el('rvcModel').value;
-  if (!rvcReady || !model) { setStatus('变声功能不可用：未检测到本地桥'); return; }
-  rvcBusy = true;
-  const btn = el('btnRvc');
-  if (btn) { btn.disabled = true; btn.textContent = '变声中…'; }
-  setStatus('RVC 变声中…（首次使用该模型需加载，稍候）');
-  const t0 = performance.now();
-  try {
-    const wav = await bufferToWav(curClip.buffer).arrayBuffer();
-    const q = new URLSearchParams({
-      model,
-      index: el('rvcIndex') ? el('rvcIndex').value : 'none',
-      index_rate: String(+el('rvcIdxRate')?.value || 0),
-      key: String(Math.round(+el('rvcKey').value || 0)),
-      ext: '.wav',
-    });
-    const r = await fetch(rvcUrl('/convert?' + q), { method: 'POST', body: wav });
-    if (!r.ok) {
-      const j = await r.json().catch(() => ({}));
-      throw new Error(j.error || ('HTTP ' + r.status));
-    }
-    const ab = await r.arrayBuffer();
-    const buf = await decodeBuf(ab);
-    if (!preRvcClip) preRvcClip = { name: curClip.name, buffer: curClip.buffer, blob: curClip.blob || null };
-    loadClip({ name: curClip.name + '·变声', buffer: buf }, { autoplay: false });
-    setStatus('✓ 变声完成 ' + fmtDur(buf.duration) + '（耗时 ' + ((performance.now() - t0) / 1000).toFixed(1) + 's），正在重新分析音高');
-    log.info('rvc', '变声完成', { model, index: q.get('index'), idxRate: q.get('index_rate'), key: q.get('key'), durSec: +buf.duration.toFixed(2) });
-  } catch (e) {
-    setStatus('RVC 变声失败：' + (e.message || e));
-    log.error('rvc', '变声失败：' + (e.message || e), { model });
-  } finally {
-    rvcBusy = false;
-    if (btn) { btn.disabled = false; btn.textContent = '变声'; }
-  }
-}
-function rvcRestore() {
-  if (!preRvcClip) return;
-  const orig = preRvcClip;
-  preRvcClip = null;
-  loadClip(orig, { autoplay: false });
-  setStatus('✓ 已还原原始音频，正在重新分析');
-  log.info('rvc', '还原原始音频', { name: orig.name });
-}
-
 // setView 已搬到 app/player.mjs（与 appView 同域；它是 appView 的唯一写入口）
 
 // ===== 导出当前片段 =====
@@ -1836,11 +1732,6 @@ function bindControls() {
   if (tapeCb) tapeCb.addEventListener('change', () => setPitchTape(!!tapeCb.checked));
   if (bNew) bNew.addEventListener('click', newSession);
   if (bExport) bExport.addEventListener('click', exportClip);
-  const bRvc = el('btnRvc'), bRvcRe = el('btnRvcRestore');
-  if (bRvc) bRvc.addEventListener('click', rvcConvert);
-  if (bRvcRe) bRvcRe.addEventListener('click', rvcRestore);
-  const rvcModelSel = el('rvcModel');
-  if (rvcModelSel) rvcModelSel.addEventListener('change', rvcSyncIndex);
   if (bImport && fileIn) bImport.addEventListener('click', () => fileIn.click());
   if (fileIn) fileIn.addEventListener('change', (e) => { const f = e.target.files[0]; if (f) importAudio(f); e.target.value = ''; });
   const bImportMidi = el('btnImportMidi'), fileMidi = el('fileMidi');
@@ -2513,8 +2404,8 @@ function projSetCurrentUI() {
 function projEmptyClip(duration) {
   // 打开"纯分析存档"(无音频)时给一个静音 clip：能驱动播放时间轴/查表画曲线，不出声
   // (isProjPlayback 现在按 bufferRef 绑定判断，有音频/无音频统一走工程查表)
-  // silent=true：这个 buffer 是静音时间轴，不是真实音频 —— 「变声」「导出」等
-  // 需要真实声音的控件据此隐藏/置灰（2026-09-16）。
+  // silent=true：这个 buffer 是静音时间轴，不是真实音频 —— 「导出」等
+  // 需要真实声音的控件据此置灰（2026-09-16）。
   if (!audioCtx) initAudio();   // 首次就开存档(没点过录音)也可能走到这里，需先有 ctx
   const buf = audioCtx.createBuffer(1, Math.max(1, Math.floor(duration * audioCtx.sampleRate)), audioCtx.sampleRate);
   return { name: '(无音频 · 仅曲线)', buffer: buf, blob: null, silent: true };
@@ -2898,7 +2789,6 @@ fillKernelSel();
 buildGlobalControls();   // 全局次级控件（原声音量）——与视图/模板无关，构建一次常驻
 ensureKernelLoaded();
 projBind();
-rvcInit();   // 探测 RVC 本地桥(2.5s 超时)，没启动则静默禁用变声功能
 logBind();
 anim.initDefault();
 applyResize();

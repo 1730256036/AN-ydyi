@@ -49,7 +49,7 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;   // RVC 桥(127.0.0.1:7865)等跨源一律放行
+  if (url.origin !== self.location.origin) return;   // 只接管同源，跨源一律放行
   if (HEAVY.test(url.pathname)) return;              // 大体积资源不缓存，交给网络
 
   // 导航请求：网络优先 → 失败回外壳

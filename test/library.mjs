@@ -41,7 +41,7 @@ console.log('[library] 曲库（我的歌单）特征测试');
 let panel = null, tabs = null, fileIn = null, listEl = null;
 const tabOf = (mode) => (tabs.children || []).find((e) => e.dataset && e.dataset.mode === mode);
 {
-  // 换一个会返回真 manifest 的 fetch（桩默认 reject，为的是让 RVC 探测快速失败）
+  // 换一个会返回真 manifest 的 fetch（桩默认 reject，为的是测试内不真发包）
   globalThis.fetch = async (url) => {
     if (/manifest\.json/.test(String(url))) {
       return { ok: true, json: async () => ({ songs: ['01 a (TH).mid', '11 b.mid'], titles: { '01 a (TH).mid': 'A 曲' } }) };

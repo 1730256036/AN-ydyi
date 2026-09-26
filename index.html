@@ -370,12 +370,6 @@
            AI转谱的显隐由 app.mjs 的 syncAnimBarDeps 按"有没有可转谱的真实音频"补刷。 -->
       <button class="btn-mini" id="btnSaveMidi" title="把当前工程音符导出为 .mid 文件(MIDI工程直出；音频工程用检测分段)">存MIDI</button>
       <button class="btn-mini" id="btnAiTrans" style="display:none" title="实验功能：Basic Pitch 本地推理(模型已内置 vendor/，无需联网)，把当前音频转成复调音符">AI转谱</button>
-      <select id="rvcModel" title="RVC 音色模型（需本地变声桥，未配置时此控件隐藏）" style="max-width:130px;display:none"></select>
-      <select id="rvcIndex" title="特征检索索引（影响音色相似度，与音高无关；无索引时自动跳过检索）" style="max-width:130px;display:none"></select>
-      <input type="number" id="rvcIdxRate" value="0.5" min="0" max="1" step="0.05" title="检索特征占比（0=不用检索）" style="width:52px;display:none">
-      <input type="number" id="rvcKey" value="0" min="-12" max="12" step="1" title="变调（半音，正=升调）。男转女一般填 +12（范围 8~12），女转男一般填 -12（范围 -12~-8），只换音色不变调填 0" style="width:56px;display:none">
-      <button class="btn-mini accent" id="btnRvc" style="display:none" title="将当前工程音频用 RVC 转换音色，并自动重新分析音高。注意：样本是当前音频——已变过一次再点会叠加变声（级联），要回到原始请先点「↩ 还原」">变声</button>
-      <button class="btn-mini" id="btnRvcRestore" style="display:none" title="还原为变声前的原始音频（同样重新分析）">↩ 还原</button>
     </div>
     <!-- 倍速簇：播放器视图与录音试听**共用一份**（故意不放进 #liveCtrls/#playCtrls——
          那两个 div 是 setView 互斥显隐的，放里面就得维护两份控件与两份状态）。

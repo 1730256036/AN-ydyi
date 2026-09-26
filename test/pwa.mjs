@@ -96,7 +96,7 @@ if (mf) {
     ck('sw.js 有版本化缓存名（改版本才会清旧缓存）', /const\s+CACHE\s*=\s*['"][^'"]*v\d+/.test(sw));
     ck('sw.js 注册了 install/activate/fetch 三个事件',
       /addEventListener\(['"]install/.test(sw) && /addEventListener\(['"]activate/.test(sw) && /addEventListener\(['"]fetch/.test(sw));
-    ck('sw.js 不拦截跨源请求（RVC 桥 127.0.0.1:7865 必须放行）', /url\.origin\s*!==\s*self\.location\.origin/.test(sw));
+    ck('sw.js 不拦截跨源请求（只接管同源）', /url\.origin\s*!==\s*self\.location\.origin/.test(sw));
   }
 }
 

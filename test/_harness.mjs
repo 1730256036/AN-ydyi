@@ -157,7 +157,7 @@ export function installStubs() {
     value: { mediaDevices: { getUserMedia: async () => ({ id: 'fake-mic' }) } },
     configurable: true,
   });
-  globalThis.fetch = () => Promise.reject(new Error('no local bridge'));   // RVC 探测快速失败
+  globalThis.fetch = () => Promise.reject(new Error('no local bridge'));   // 测试内不真发包（存档列表/曲库 manifest 等一律快速失败）
   // 面板里的删除/清空/重命名会弹原生对话框；不桩会直接 ReferenceError，
   // 被元测试误判成"按钮抛异常"。
   globalThis.confirm = () => true;

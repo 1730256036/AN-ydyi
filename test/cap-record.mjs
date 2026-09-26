@@ -95,7 +95,7 @@ Object.defineProperty(globalThis, 'navigator', {
   value: { mediaDevices: { getUserMedia: async () => ({ id: 'fake-mic' }) } },
   configurable: true,
 });
-globalThis.fetch = () => Promise.reject(new Error('no local bridge'));   // RVC 探测快速失败
+globalThis.fetch = () => Promise.reject(new Error('no local bridge'));   // 测试内不真发包
 let lastBlob = null;                                                     // 抓住真正被下载的字节
 globalThis.URL.createObjectURL = (b) => { lastBlob = b; return 'blob:fake'; };
 globalThis.URL.revokeObjectURL = () => {};
