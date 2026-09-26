@@ -257,7 +257,7 @@ const seg = (s, from, to) => {
 {
   const poolSrc = fs.readFileSync(ROOT + 'dsp/analyze-pool.mjs', 'utf8');
   const analyzeSrc = fs.readFileSync(ROOT + 'dsp/analyze.mjs', 'utf8');
-  ck('★分片 postMessage 带上了本片在整段里的起点（否则 SwiftF0 帧表按错时间段查）',
+  ck('★分片 postMessage 带上了本片在整段里的起点（否则内核帧表按错时间段查）',
     /tOffsetSec:\s*sl\.s\s*\/\s*sr/.test(poolSrc),
     (poolSrc.match(/postMessage\(\{[^}]*\}[^)]*\)/) || [''])[0]);
   ck('★analyze 把偏移加回窗时间再喂 setWindowTime（绝对时间口径）',

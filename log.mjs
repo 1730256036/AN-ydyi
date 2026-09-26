@@ -9,7 +9,7 @@
 //   2. 结构化条目 {seq, ts, level, cat, msg, data} —— 人能读，机器也能解析；
 //   3. 内存环形缓冲 + IndexedDB 落盘 —— 刷新/关页面都不丢（用户不必当场导出）；
 //   4. 全局捕获 onerror / unhandledrejection / console.error —— 不依赖主动打点，
-//      three.js、tfjs 这类第三方库的报错也能进日志；
+//      tfjs 这类第三方库的报错也能进日志；
 //   5. 会话 ID —— 一次打开的所有日志串成一条线，多次录音可区分先后；
 //   6. 批量写盘 —— 每条都开事务会拖慢主流程，攒批或定时 flush。
 //
@@ -277,7 +277,7 @@ if (typeof window !== 'undefined' && !window.__ydyiLogHooked) {
     const r = ev.reason;
     log.error('promise', '未处理的 Promise 拒绝：' + (r && r.message ? r.message : String(r)), { stack: r && r.stack ? String(r.stack).slice(0, 800) : undefined });
   });
-  // 拦截 console.error：three.js / tfjs 等第三方库的报错不走 window.onerror，
+  // 拦截 console.error：tfjs 等第三方库的报错不走 window.onerror，
   // 只能这样收进日志。用原生方法回写，避免与上面的 write() 递归套娃。
   console.error = (...args) => {
     try { write(LEVELS.ERROR, 'console', args.map((a) => (a && a.message) ? a.message : String(a)).join(' ')); } catch (e) {}

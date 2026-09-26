@@ -2,7 +2,7 @@
 // sw.js —— Service Worker（2026-09-15）
 //
 // 这个项目说「离线」有两层意思，别混：
-//   ① 不依赖互联网 —— 三方资源（onnx 模型/wasm、音色采样、tfjs、basic-pitch）早就全在本地，
+//   ① 不依赖互联网 —— 三方资源（音色采样、tfjs、basic-pitch）早就全在本地，
 //      页面本身也由本机 `node server.mjs` 提供。这一层【早就成立】，跟 SW 无关。
 //   ② 可安装 + 外壳离线 —— 这才是 SW 带来的：装成独立窗口的 App、断网/服务未起时外壳仍能开。
 //
@@ -13,7 +13,7 @@
 //   ⚠️ 站点带 `Cache-Control: no-store`（server.mjs）——那只影响浏览器 HTTP 缓存，
 //      不影响 SW 的 Cache API，所以这里依然存得住。
 //
-// 不缓存什么：wasm / onnx / mp3 / sf2 这类大体积二进制。它们本来就在本机、秒开，
+// 不缓存什么：mp3 / bin 这类大体积二进制。它们本来就在本机、秒开，
 //   缓存唯一效果是把 16MB 采样再复制一份，收益为零。
 // ============================================================
 const CACHE = 'ydyi-shell-v1';
@@ -25,7 +25,7 @@ const SHELL = [
   './icon-512.png',
   './icon-180.png',
 ];
-const HEAVY = /\.(wasm|onnx|bin|data|mp3|sf2|sf3)$/i;
+const HEAVY = /\.(bin|data|mp3)$/i;
 
 self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
