@@ -23,9 +23,12 @@ vendor/basic-pitch/*
 !vendor/basic-pitch/matchers.js
 !vendor/basic-pitch/toMidi.js
 !vendor/basic-pitch/model
+!vendor/basic-pitch/LICENSE
+!vendor/basic-pitch/NOTICE.md
 !vendor/tfjs
 vendor/tfjs/*
 !vendor/tfjs/tf.min.js
+!vendor/tfjs/LICENSE
 !vendor/soundfonts
 
 # 本地素材与导出：运行时或调试产生，不入库

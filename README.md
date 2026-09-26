@@ -102,13 +102,26 @@ logs/              本地日志与调试导出（不入库）
 
 本仓库内含以下第三方内容，**版权归各自作者所有**，使用与再分发前请核对上游许可：
 
-| 路径 | 来源 | 说明 |
-|---|---|---|
-| `vendor/basic-pitch/` | Google Magenta basic-pitch | Apache-2.0；此处为打了本地化补丁的 4 个源文件 + 随仓库分发的模型权重 |
-| `vendor/tfjs/` | TensorFlow.js | Apache-2.0；AI 转谱运行时的浏览器构建（`tf.min.js`） |
-| `vendor/soundfonts/FluidR3_GM/` | FluidR3 GM SoundFont | 琴声采样 |
-| `vendor/soundfonts/salamander/` | Salamander Grand Piano | 琴声采样 |
-| `demo/*.mid` | 东方 Project 同人编曲 + 古典曲目 | 仅作功能示范 |
+| 路径 | 来源 | 许可 | 说明 |
+|---|---|---|---|
+| `vendor/basic-pitch/` | Spotify [basic-pitch](https://github.com/spotify/basic-pitch) v1.0.1 | Apache-2.0 | 4 个 ESM 源文件 + 预训练模型权重；**源文件已作本地化修改**，见目录内 `NOTICE.md` |
+| `vendor/tfjs/` | [TensorFlow.js](https://github.com/tensorflow/tfjs)（Google） | Apache-2.0 | AI 转谱的浏览器构建 `tf.min.js`（文件内保留原始版权头） |
+| `vendor/soundfonts/FluidR3_GM/` | FluidR3 GM SoundFont，经 [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts) 预渲染 | **CC-BY 3.0** | 琴声采样（mp3） |
+| `vendor/soundfonts/salamander/` | **Salamander Grand Piano V3**，by Alexander Holm | **CC-BY 3.0** | 琴声采样（mp3） |
+| `demo/*.mid` | 东方 Project 同人编曲 + 古典曲目 | 未标明 | 仅作功能示范 |
+
+Apache-2.0 与 CC-BY 3.0 的**许可全文**分别随附在各自目录下的 `LICENSE` 文件中。
+
+### CC-BY 3.0 署名
+
+以下音源采样依 **Creative Commons Attribution 3.0 Unported（CC BY 3.0）** 授权，
+署名是该许可的强制要求（署名不代表原作者对本项目的认可或背书）：
+
+- **Salamander Grand Piano V3** — by **Alexander Holm**（SFZ 实现：kinwie）。
+  本项目将其采样转换为 mp3 以便浏览器播放。原作品：<https://archive.org/details/SalamanderGrandPianoV3>
+- **FluidR3 GM SoundFont** — 经 <https://github.com/gleitz/midi-js-soundfonts> 预渲染为 mp3。
+
+许可全文：<https://creativecommons.org/licenses/by/3.0/>
 
 AI 转谱需要的两个大文件随仓库分发（basic-pitch 模型权重 + `vendor/tfjs/tf.min.js`，约 2.3MB），开箱即用；
 `app.mjs` 中 `aiTranscribe` 附近的恢复说明只在文件被删时才用得上。
@@ -148,3 +161,15 @@ node test/xxx.mjs        # 挑一个单独跑
 
 跑测试需要 **Node.js 22.15+**（`test/smoke.mjs`、`test/cap-record.mjs` 用了 `node:module` 的 `registerHooks`）；
 只跑应用 18+ 就够 —— `package.json` 的 `engines` 写 `>=18` 正是这个原因，别被它误导。
+
+---
+
+## 许可
+
+本项目（AN-ydyi）采用 **GNU Affero General Public License v3.0**（AGPL-3.0）授权，
+全文见仓库根目录的 [`LICENSE`](LICENSE)。
+
+AGPL-3.0 是强著佐权（copyleft）许可：你可以自由使用、修改、分发，但**衍生作品必须以同样许可开源**——
+包括把修改后的版本部署成网络服务供他人使用的情形（这是 AGPL 相对 GPL 增加的条款）。
+
+`vendor/` 与 `demo/` 下的第三方内容**不适用**本项目许可，各自遵循其原许可（见上文「第三方资产与许可」）。
