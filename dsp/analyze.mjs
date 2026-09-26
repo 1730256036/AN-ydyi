@@ -73,8 +73,8 @@ export function analyzePCM(pcm, sr, opt = {}, onTick = null) {
   if (cfg.sens !== undefined) det.setSens(cfg.sens);
 
   // 同一内核单例供 setWindowTime：resolveKernel 返回与 createDetector 内部同一对象实例。
-  // 离线逐窗把当前窗绝对时间喂给路由内核 → route.frame 经 primary.atTime 精确取 SwiftF0 帧
-  //（实时模式无人调用 setWindowTime，route 自动走 latestF0 缓存，两路互不干扰）。
+  // 若内核支持 setWindowTime（按窗绝对时间取帧），离线逐窗喂给它；
+  // 当前三个内核（YIN/MPM/pYIN）均为同步逐窗，不实现该钩子。
   const kernelT = resolveKernel(cfg.kernel);
 
   const frames = [];
@@ -93,10 +93,10 @@ export function analyzePCM(pcm, sr, opt = {}, onTick = null) {
     const p = i * hop;
     win.set(pcm.subarray(p, p + N));
     t = i * hopMs;
-    // 喂给路由内核的必须是**整段绝对时间**：分片 Worker 时各片音频起点不同，
+    // 喂给支持 setWindowTime 的内核时必须是**整段绝对时间**：分片 Worker 时各片音频起点不同，
     // 由主线程在 opt.tOffsetSec 里带上本片在整段里的起点（单线程路径为 0）。
-    // 只喂片内相对时间不够：route 拿它去查**整段** SwiftF0 帧表，
-    // 于是第 2 片起取到的是"开头"那段的音高（>8s 素材 + route-swift-yin 内核即中）。
+    // 只喂片内相对时间不够：内核按此时间查的是**整段**帧表，
+    // 否则第 2 片起会取到"开头"那段的音高（>8s 素材即中）。
     const tAbs = t / 1000 + (cfg.tOffsetSec || 0);
     if (kernelT && typeof kernelT.setWindowTime === 'function') kernelT.setWindowTime(tAbs);
     const r = det.processWindow(win);
@@ -146,43 +146,16 @@ export function analyzePCM(pcm, sr, opt = {}, onTick = null) {
 }
 
 // 整段分析·异步版（Worker / 无 Worker 的 node 路径用）：
-// 离线链路中 SwiftF0 是异步 ONNX 推理。两种取帧方式（二选一，见 autoAnalyzeClip）：
-//   A. 主线程预推理：调用方在 cfg.swiftFrames 传入帧表（主线程 session 已确认可用），
-//      这里直接 _injectOffline，绕开 worker 内建 session/推理的不稳定。
-//   B. 本地推理：无帧表时在当前环境(worker/主线程/单线程)先整段/分块跑一次。
-// 均失败自动回退纯 YIN，但失败原因会打日志（不再静默吞掉，便于定位）。
+// 当前三个内核（YIN / MPM / pYIN）都是同步的，本函数等价于 analyzePCM；
+// 保留 async 签名是为了让 worker 与单线程两条路径共用同一入口。
 export async function analyzePCMAsync(pcm, sr, opt = {}, onTick = null) {
   const cfg = { ...DEF, ...opt };
   const kernel = resolveKernel(cfg.kernel);
-  if (kernel && typeof kernel.runOffline === 'function') {
-    // A: 主线程预推理帧表（推荐；worker 无需碰 onnx）
-    if (Array.isArray(cfg.swiftFrames) && cfg.swiftFrames.length) {
-      try {
-        kernel._injectOffline(cfg.swiftFrames);
-        console.info(`[analyze] SwiftF0 注入离线帧表 ${cfg.swiftFrames.length} 帧（主线程预推理）`);
-      } catch (e) { console.warn('[analyze] SwiftF0 帧表注入失败:', e && e.message || e); }
-    } else {
-      // B: 本地推理兜底
-      try {
-        if (!kernel.ready()) { try { await kernel.load(); } catch (e) { console.warn('[analyze] SwiftF0 加载失败(将回退纯 YIN):', e && e.message || e); } }
-        if (kernel.ready()) {
-          const n = await kernel.runOffline(pcm, sr, onTick);
-          console.info(`[analyze] SwiftF0 本地整段推理 ${n ? n.length : 0} 帧`, n ? `(conf平均 ${(n.reduce((a, x) => a + (x.conf || 0), 0) / n.length).toFixed(3)})` : '');
-        } else console.warn('[analyze] SwiftF0 未就绪，本次离线回退纯 YIN');
-      } catch (e) { console.error('[analyze] SwiftF0 离线推理异常(回退纯 YIN):', e && e.message || e); }
-    }
-  }
   try {
     return analyzePCM(pcm, sr, opt, onTick);
   } finally {
     try {
-      if (kernel && typeof kernel.getStats === 'function') {
-        const st = kernel.getStats();
-        const t = st.hit + st.fallback + st.noFrame + st.lowConf + st.outOfRange + st.notReady;
-        console.info(`[analyze] 路由统计: hit=${st.hit} fallback=${st.fallback} lowConf=${st.lowConf} noFrame=${st.noFrame} outOfRange=${st.outOfRange} notReady=${st.notReady} → SwiftF0离线占比=${t ? Math.round(100 * st.hit / t) : 0}%`);
-      }
       if (kernel && typeof kernel.setWindowTime === 'function') kernel.setWindowTime(null);
-      if (kernel && typeof kernel._clearOffline === 'function') kernel._clearOffline();
     } catch (e) { /* 清理失败不影响结果 */ }
   }
 }

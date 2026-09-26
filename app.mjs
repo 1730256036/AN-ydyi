@@ -184,13 +184,13 @@ function processBlock() {          // 实时检测：拉窗 → 门控 → 平�
   // 录音中：把每窗时域 PCM 追加进累积缓冲（试听/暂停回拖的数据源；MediaRecorder 只有
   // stop 才有 blob，试听必须在录制时就攒一份可播放的 PCM）
   if (recState === 'rec' && lastTD) appendRecPcm(lastTD);
-  // 异步内核钩子(如 SwiftF0)：每窗把原始波形喂给它(核内重采样/块推理，不阻塞这里)。
+  // 异步内核钩子（供需要逐窗喂原始波形的内核使用）：不阻塞这里。
   // 第 3 参 = 本窗末样本的音频时钟时间：滑窗相邻两帧重叠 ~90%，内核必须靠它只取新增样本，
   // 否则重叠段重复进流，16k 时间轴按重叠倍数虚增（实测 5.57×）→ 取帧时间戳全废。
   const kn = activeKernel();
   if (kn && typeof kn.pushSample === 'function') { try { kn.pushSample(lastTD, ctxSr, recTimeSec()); } catch (e) {} }
-  // 实时取帧也按【当前窗绝对时间】对齐缓存(SwiftF0 ring 与检测窗同起点=录音首窗)：
-  // route.frame 经 atTime(tSec) 沿缓存逐帧前进，消除"每攒批 0.25s 推 29 帧、期间各窗复用同一
+  // 实时取帧也按【当前窗绝对时间】对齐缓存（内核 ring 与检测窗同起点=录音首窗）：
+  // 内核可经 setWindowTime(tSec) 沿缓存逐帧前进，消除"每攒批 0.25s 推 29 帧、期间各窗复用同一
   // 最新帧"造成的阶梯/滞后感(与离线按窗时间取帧同一套机制)。零开销，仅一次赋值。
   if (kn && typeof kn.setWindowTime === 'function') { try { kn.setWindowTime(recTimeSec()); } catch (e) {} }
   processOneWindow(lastTD);
@@ -379,18 +379,6 @@ function tick(now) {
   // 两者都在 app/capture.mjs 的 capTick() 里（capDest 为空时直接返回，零开销）。
   capTick();
   try { updateTransportUI(); } catch (e) {}
-  // SwiftF0 路由命中诊断：每 5s 打一条日志，确凿显示主内核(SwiftF0)是否真在出值，
-  // 而不是全程哑回退回 YIN。console 打开即可看到「SwiftF0占比」。
-  const knDiag = activeKernel();
-  if (knDiag && typeof knDiag.getStats === 'function' && now - lastRouteDiag >= 5000) {
-    lastRouteDiag = now;
-    const st = knDiag.getStats();
-    const t = st.hit + st.fallback + st.noFrame + st.lowConf + st.outOfRange + st.notReady;
-    log.info('kernel', '路由统计(5s): ' +
-      `hit=${st.hit} fallback=${st.fallback} lowConf=${st.lowConf} noFrame=${st.noFrame} ` +
-      `outOfRange=${st.outOfRange} notReady=${st.notReady} → SwiftF0占比=${t ? Math.round(100 * st.hit / t) : 0}%`, st);
-    knDiag.resetStats();
-  }
   const dt = now - lastT; lastT = now;
   if (echoOn) { try { echoFeed(d); } catch (e) { console.error('echo', e); } }
   if (dt > 0) { fpsAcc += 1000 / dt; fpsCnt++; if (fpsCnt >= 20) { fpsVal = fpsAcc / fpsCnt; fpsAcc = 0; fpsCnt = 0; } }
@@ -398,7 +386,6 @@ function tick(now) {
   rafId = requestAnimationFrame(tick);
 }
 // playInfo / pl / appView / curClip / clipSeq 已搬到 app/player.mjs（① 第五域）
-let lastRouteDiag = 0;             // 路由命中诊断节流(ms)
 function ensureLoop() { if (!rafId) { lastT = performance.now(); rafId = requestAnimationFrame(tick); } }
 
 // 是否"回放工程"：播放器界面 + 有片段 + 工程分析就绪 + 非实时录音
@@ -747,7 +734,7 @@ function applySens(v) {
 // ===== 检测算法（内核）切换 =====
 const kernelsList = () => availableKernels();
 const kernelNow = () => kernelsList().find(k => k.id === kernelId) || { id: kernelId, name: kernelId };
-// 需要异步加载的内核(如 SwiftF0：模型+onnx session) → 后台加载，失败由路由自动回退同步兜底。
+// 需要异步加载的内核（若某内核要预载模型/资源）→ 后台加载，失败自动回退同步兜底。
 function ensureKernelLoaded() {
   const kn = activeKernel();
   if (!kn || typeof kn.load !== 'function') return;
@@ -1433,26 +1420,6 @@ async function autoAnalyzeClip(clip) {
   log.info('analyze', '开始离线整段分析', {
     name: clip.name, durationSec: +buf.duration.toFixed(2), sampleRate: buf.sampleRate, ...opt,
   });
-  // SwiftF0：主线程 session(已由 ensureKernelLoaded 加载)整段预推理，帧表经 opt.swiftFrames
-  // 传给分析 worker，彻底绕开 worker 内建 onnx/session 的不稳定。失败返回 undefined → worker 端兜底/纯 YIN。
-  if (kernelId === 'route-swift-yin') {
-    const kn = activeKernel();
-    if (kn && typeof kn.runOffline === 'function') {
-      let pre = undefined;
-      try {
-        if (!kn.ready()) { try { await kn.load(); } catch (e) {} }
-        if (kn.ready()) {
-          const fr = await kn.runOffline(pcm, buf.sampleRate, null);
-          // 预推理结果已装入 opt.swiftFrames 后，立即清主线程槽位：
-          // 否则后续实时录音的 route.atTime 会读到这段旧音频的帧表
-          if (kn && typeof kn._clearOffline === 'function') { try { kn._clearOffline(); } catch (e) {} }
-          if (fr && fr.length) { pre = fr; log.info('analyze', 'SwiftF0 主线程预推理完成', { frames: fr.length }); }
-          else log.warn('analyze', 'SwiftF0 主线程预推理无输出', {});
-        } else log.warn('analyze', 'SwiftF0 主线程未就绪，本次离线由 worker 端兜底/纯 YIN', {});
-        if (pre) opt.swiftFrames = pre;
-      } catch (e) { console.error('[analyze] SwiftF0 主线程预推理失败:', e && e.message || e); }
-    }
-  }
   analyzeOffline(pcm, buf.sampleRate, opt, { onProgress })
     .then((analysis) => {
       if (analyzeSeq !== seq) return;   // 过期(用户已切走/新建)
@@ -2328,33 +2295,6 @@ function refreshAnimBar() {
         (og || ts).appendChild(o);
       }
       ts.value = cur.getTimbre ? cur.getTimbre() : 'salamander';
-      // 本地音源 sf2：选了「本地音源 sf2 / sf3」才出现的文件按钮（文件不进仓库）
-      const sfBtn = document.createElement('button');
-      sfBtn.className = 'btn-mini';
-      sfBtn.textContent = '选sf2';
-      sfBtn.title = '选一个本地 .sf2 / .sf3 / .dls 音源文件（如 THfont、SD-90 采样包）。文件只在浏览器里用，不会上传也不会进仓库。加载失败自动退回内置合成器。';
-      sfBtn.style.display = 'none';
-      const sfIn = document.createElement('input');
-      sfIn.type = 'file'; sfIn.accept = '.sf2,.sf3,.dls'; sfIn.style.display = 'none';
-      sfIn.addEventListener('change', async () => {
-        const f = sfIn.files && sfIn.files[0];
-        if (!f) return;
-        setStatus('正在读取音源 ' + f.name + ' …');
-        try {
-          const buf = await f.arrayBuffer();
-          if (cur.setSf2Bank) cur.setSf2Bank(buf);
-          setStatus('✓ 已载入音源 ' + f.name + '（' + (buf.byteLength / 1048576).toFixed(1) + 'MB），下一个音就会用它');
-        } catch (e) {
-          setStatus('音源读取失败：' + (e && e.message || e));
-        }
-        sfIn.value = '';
-      });
-      sfBtn.addEventListener('click', () => sfIn.click());
-      const syncSfBtn = () => { sfBtn.style.display = ts.value === 'sf2local' ? '' : 'none'; };
-      ts.addEventListener('change', syncSfBtn);
-      syncSfBtn();
-      tl.appendChild(sfBtn);
-      tl.appendChild(sfIn);
       ts.addEventListener('change', () => {
         if (cur.setTimbre) cur.setTimbre(ts.value);
         // 琴声恒开（2026-09-19 删开关）：换音色必然立刻能听到，无需再补开

@@ -69,7 +69,7 @@ export function createDetector(opt = {}) {
   let lastGoodSemi = NaN;
 
   // ===== 轨迹级离群抑制（防噪声帧把曲线拽到超高/超低）=====
-  // 背景：YIN/MPM/pYIN/SwiftF0 全是逐窗独立判定，单个强噪声窗(拍桌/气音/瞬态)
+  // 背景：YIN/MPM/pYIN 全是逐窗独立判定，单个强噪声窗(拍桌/气音/瞬态)
   // 仍能穿过帧内门控给出离谱频率(如 40Hz 或 8kHz)，而短窗中值滤波对连续数帧
   // 的错误段无能为力。这里的做法是"轨迹级两帧确认"：
   //   - |当前候选 - 已确认平滑值| ≤ JUMP_CENTS → 正常跟随（并清掉待确认态）；
@@ -109,7 +109,7 @@ export function createDetector(opt = {}) {
     // 单窗算法判定交内核：产出候选频率 + 品质信号（str/purity/prom）。
     // 内联的 peakTrack/yin/fusePoint 组合已下沉到 dsp/kernels/yin.mjs，
     // 门控公式/状态机/平滑/能量门仍在本函数(算法无关)，纹理数值与原实现逐位一致。
-    // 防御：异步/未接入内核(如 SwiftF0 的 frame 占位返回 null)或部分字段缺失时，
+    // 防御：内核 frame 返回 null 或部分字段缺失时，
     // 一律视为"无声帧"，避免 str/purity/prom 变成 undefined 导致门控比较 NaN 崩。
     const rk0 = kernel.frame(win, sr, { windowSize: N, fmin, fmax, voicing });
     const rk = (rk0 && typeof rk0 === 'object')

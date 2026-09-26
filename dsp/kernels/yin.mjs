@@ -8,11 +8,11 @@
 // 不碰门控公式 / 置信状态机 / 中值平滑 / 能量门——那套判定外围在
 // dsp/detect.mjs 的 processWindow 里，跟具体算法无关，换内核不用改。
 //
-// 想加新算法（pYIN / SwiftF0 / MPM…）：
+// 想加新算法（pYIN / MPM …）：
 //   1. 新建 dsp/kernels/你的算法.mjs，default 导出同款接口的 { id, name, frame, load?, async }；
 //   2. 在 dsp/kernels/index.mjs 里 register 它；
 //   3. createDetector({ kernel: '你的id' }) 即可切换，门控/平滑/录音沉淀全不动。
-//   注意：接口目前是【同步】 frame()。SwiftF0 这类异步(ONNX/worker)后端，
+//   注意：接口目前是【同步】 frame()。异步(ONNX/worker)后端需额外包装，
 //   async 建议 true 并提供 load()，实时侧后续在 worker 里桥接（届时再扩展本契约）。
 // ============================================================
 import { peakTrack, yin, fusePoint } from '../core.mjs';

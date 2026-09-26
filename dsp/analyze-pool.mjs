@@ -22,7 +22,7 @@ export function analyzeOffline(pcm, sr, opt = {}, hooks = {}) {
   const hasWorker = typeof Worker !== 'undefined';
   const workerCount = hasWorker ? Math.max(1, Math.min(6, opt.workerCount || defaultWorkers())) : 1;
 
-  // ---- 无 Worker：单线程直跑（异步版：SwiftF0 先整段推理再逐窗） ----
+  // ---- 无 Worker：单线程直跑（异步版入口，逐窗同步跑完） ----
   if (!hasWorker || workerCount === 1) {
     return analyzePCMAsync(pcm, sr, opt, (p) => {
       if (hooks.onProgress) hooks.onProgress(p.done / Math.max(1, p.total), '');
@@ -106,9 +106,9 @@ export function analyzeOffline(pcm, sr, opt = {}, hooks = {}) {
       // （表现为整段分析卡在 1/slices 处不动）。故先把每片拷贝到独立缓冲再转移。
       const sub = new Float32Array(sl.e - sl.s);
       sub.set(pcm.subarray(sl.s, sl.e));
-      // tOffsetSec：本片音频在**整段**里的起点（秒）。opt 里可能带整段帧表（SwiftF0），
-      // 而 worker 只看得见自己这一片 → 不给这个偏移，kernelT.setWindowTime 收到的是
-      // "片内相对时间"，查整段表就查到开头去了（第 2 片起全错，2026-09-18 修）。
+      // tOffsetSec：本片音频在**整段**里的起点（秒）。worker 只看得见自己这一片，
+      // 不给这个偏移，kernelT.setWindowTime 收到的是"片内相对时间"，
+      // 按它查整段表就会查到开头去（第 2 片起全错，2026-09-18 修）。
       // 其余配置照旧透传（浅拷贝即可，worker 只读）。
       w.postMessage({ id: i, pcm: sub, sr, opt: Object.assign({}, opt, { tOffsetSec: sl.s / sr }) }, [sub.buffer]);
     }

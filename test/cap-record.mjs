@@ -149,15 +149,6 @@ globalThis.MediaRecorder = class {
   __chunkBytes(u8) { if (this.ondataavailable) this.ondataavailable({ data: new Blob([u8]) }); }
 };
 
-// ---------- three 裸导入重定向（app.mjs 的注册表仍写着 gl 接口，需能解析） ----------
-registerHooks({
-  resolve(spec, ctx, next) {
-    if (spec === 'three') return { url: pathToFileURL(join(ROOT, 'node_modules/three/build/three.module.js')).href, shortCircuit: true };
-    if (spec.startsWith('three/addons/')) return { url: pathToFileURL(join(ROOT, 'node_modules/three/examples/jsm/')).href + spec.slice('three/addons/'.length), shortCircuit: true };
-    return next(spec, ctx);
-  },
-});
-
 const click = (id, n = 0) => {
   const h = byId(id).__listeners.click;
   if (!h || !h[n]) { ck(`#${id} 绑定了 click 处理函数`, false, '没找到监听器'); return false; }

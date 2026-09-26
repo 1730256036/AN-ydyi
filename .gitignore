@@ -11,7 +11,7 @@ Thumbs.db
 
 # 第三方资产：默认整体不入库，再按白名单逐项放行。
 # basic-pitch 放行的是打了本地化补丁的 4 个源文件与其模型权重；
-# tfjs 与 SwiftF0 的模型/运行时是 AI 转谱与 SwiftF0 内核开箱即用所必需。
+# tfjs 是 AI 转谱运行时的浏览器构建（UMD，浏览器 <script> 直引）。
 vendor/*
 !vendor/basic-pitch
 vendor/basic-pitch/*
@@ -23,12 +23,6 @@ vendor/basic-pitch/*
 !vendor/tfjs
 vendor/tfjs/*
 !vendor/tfjs/tf.min.js
-!vendor/swiftf0
-vendor/swiftf0/*
-!vendor/swiftf0/model.onnx
-!vendor/spessasynth
-vendor/spessasynth/*
-!vendor/spessasynth/spessasynth_processor.min.js
 !vendor/soundfonts
 
 # 本地素材与导出：运行时或调试产生，不入库

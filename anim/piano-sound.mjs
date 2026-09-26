@@ -88,9 +88,6 @@ export const TIMBRES = [
   GM('gm_harpsichord', '大键琴', '其它键盘', 'harpsichord', false),
   GM('gm_synth_bass', '合成贝斯', '其它键盘', 'synth_bass_1', true),
 
-  { id: 'sf2local', label: '本地音源 sf2 / sf3（自选文件）', group: '本地音源', kind: 'sf2',
-    base: null, inst: null, style: null, midis: [], sus: true, minOk: 0 },
-
   { id: 'synth', label: '内置合成器（离线兜底）', group: '离线兜底', kind: 'synth',
     base: null, inst: null, style: null, midis: [], sus: true, minOk: 0 },
 ];
@@ -124,47 +121,6 @@ function slotOf(t) {
 }
 slotOf(cur);
 
-// ---- 本地音源（kind:'sf2'）----
-// 用户自选 .sf2/.sf3 文件（面板文件按钮），浏览器内由 SpessaSynth(Apache-2.0) 解码播放。
-// 这样真·东方音源（THfont / SD-90 采样包）也能用，且文件不进仓库（授权灰区，只本地自用）。
-// 依赖链（importmap 已配）：spessasynth_lib → spessasynth_core → stb-vorbis；
-// AudioWorklet 处理器在 vendor/spessasynth/spessasynth_processor.min.js（addModule 一次）。
-const SF2_WORKLET_URL = './vendor/spessasynth/spessasynth_processor.min.js';
-let sf2Buf = null;             // 用户选入的音库 ArrayBuffer
-let sf2Synth = null;           // SpessaSynth WorkletSynthesizer（懒建，失败置 null 走合成器）
-let sf2Chan = 0;               // 轮转通道 0..15：同音高叠加时避免 noteOff 互相掐断
-let sf2WorkletAdded = false;   // addModule 同一 URL 重复调用会 reject，做一次性标记
-
-// 选入音库文件（app.mjs 面板文件按钮调用）。加载在 loadCurrent 里懒做。
-export function setSf2Bank(buf) {
-  sf2Buf = buf instanceof ArrayBuffer ? buf : null;
-  if (sf2Synth) { try { sf2Synth = null; } catch (e) {} }   // 换文件重建（简单起见不热替换）
-  const s = slotOf(cur);
-  if (cur.kind === 'sf2' && s.state !== 'idle') { s.state = 'idle'; if (actx) loadCurrent(); }
-}
-
-async function loadSf2() {
-  const s = slotOf(cur);
-  try {
-    if (!sf2Buf) { s.state = 'needfile'; return; }
-    if (!sf2Synth) {
-      if (!sf2WorkletAdded) {
-        await actx.audioWorklet.addModule(SF2_WORKLET_URL);
-        sf2WorkletAdded = true;
-      }
-      const { WorkletSynthesizer } = await import('spessasynth_lib');
-      sf2Synth = new WorkletSynthesizer(actx);
-      sf2Synth.connect(master);        // 走本引擎的音量/压限主链，与其它音源同一把音量
-    }
-    await sf2Synth.soundBankManager.addSoundBank(sf2Buf, 'ydyi-sf2');
-    s.state = 'ready';
-  } catch (e) {
-    console.error('[piano-sound] 本地音源加载失败，退回合成器:', e);
-    sf2Synth = null;
-    s.state = 'fallback';
-  }
-}
-
 export function soundEnabled() { return soundOn; }
 
 export function soundStatus() {
@@ -179,7 +135,6 @@ export function soundStatus() {
     timbreLabel: cur.label,
     timbreCount: TIMBRES.length,
     tKind: cur.kind,
-    sf2Loaded: !!sf2Buf,
   };
 }
 
@@ -241,13 +196,6 @@ export function ensureAudio() {
 function loadCurrent() {
   const t = cur, s = slotOf(t);
   if (t.kind === 'synth') { s.state = 'synth'; return Promise.resolve(); }
-  if (t.kind === 'sf2') {
-    if (s.state === 'ready' && sf2Synth) return Promise.resolve();
-    if (s.state === 'loading' && s.promise) return s.promise;
-    s.state = 'loading';
-    s.promise = loadSf2();
-    return s.promise;
-  }
   if (s.state === 'loading' || s.state === 'ready') return s.promise || Promise.resolve();
   if (!actx) return Promise.resolve();
   s.state = 'loading'; s.loaded = 0;
@@ -302,16 +250,6 @@ export function playPianoNote(midi, delaySec, durMs) {
   const g = actx.createGain();
   g.connect(master);
   const s = slotOf(cur);
-  // 本地音源（SpessaSynth）：noteOn/noteOff 无时间参数，延迟用 setTimeout 调度。
-  // 精度受主线程影响（忙时可能晚几十 ms）——块落键对齐要求高的场景建议用采样型音色。
-  if (s.state === 'ready' && cur.kind === 'sf2' && sf2Synth) {
-    const ch = sf2Chan; sf2Chan = (sf2Chan + 1) % 16;   // 轮转通道：同音高叠加不互相掐
-    try {
-      sf2Synth.noteOn(ch, midi, 100);
-      setTimeout(() => { try { sf2Synth.noteOff(ch, midi); } catch (e) {} }, Math.round(hold * 1000));
-      return;
-    } catch (e) { console.error('[piano-sound] sf2 弹奏失败:', e); }
-  }
   if (s.state === 'ready') {
     const near = nearestBuf(s.bufs, midi);
     if (!near) return fallbackTone(midi, t0, hold, g);

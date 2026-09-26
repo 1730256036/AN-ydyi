@@ -39,19 +39,15 @@ for (const t of TIMBRES) {
     typeof t.id === 'string' && t.id.length > 0
     && typeof t.label === 'string' && t.label.length > 0
     && typeof t.group === 'string' && t.group.length > 0
-    && (t.kind === 'sample' || t.kind === 'synth' || t.kind === 'sf2')
+    && (t.kind === 'sample' || t.kind === 'synth')
     && typeof t.sus === 'boolean'
     && (t.kind === 'sample'
       ? (typeof t.base === 'string' && t.base.startsWith('./vendor/soundfonts/')
         && (t.style === 'sharp' || t.style === 'flat')
         && t.midis.length > 0
         && (t.inst === null || typeof t.inst === 'string'))
-      : (t.midis.length === 0 && t.base === null)));   // synth / sf2 不走 CDN 采样
+      : (t.midis.length === 0 && t.base === null)));   // synth 不走 CDN 采样
 }
-
-// ⑤b 本地音源恰有一个，且 id 固定（面板靠 'sf2local' 判定显隐）
-ck('本地音源入口 sf2local 恰有一个', TIMBRES.filter((t) => t.kind === 'sf2').length === 1
-  && !!timbreById('sf2local'));
 
 // ⑥ 采样型：midis 严格升序、在 88 键音域内、无重复采样点
 for (const t of TIMBRES.filter((x) => x.kind === 'sample')) {

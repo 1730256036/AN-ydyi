@@ -19,7 +19,7 @@
 
 // 钢琴声引擎已抽出共享(2026-09-13)：跟音练习/回声模式也弹琴，逐行搬去
 // anim/piano-sound.mjs，行为与存储键零变化。
-import { ensureAudio, playPianoNote, setSoundEnabled, setPianoVolume, soundEnabled, soundStatus, listTimbres, getTimbre, setTimbre, setSf2Bank } from './piano-sound.mjs';
+import { ensureAudio, playPianoNote, setSoundEnabled, setPianoVolume, soundEnabled, soundStatus, listTimbres, getTimbre, setTimbre } from './piano-sound.mjs';
 
 // —— 可调 ——
 const LOOKAHEAD_MS = 4200;    // 未来可视窗：4200ms 的未来铺满键盘线上方
@@ -1723,7 +1723,6 @@ function drawSoundBadge() {
   let label;
   if (st.sampleState === 'ready') label = head + '采样就绪';
   else if (st.sampleState === 'loading') label = head + '加载中 ' + st.loadedCount + '/' + st.sampleCount;
-  else if (st.sampleState === 'needfile') label = head + '请选 sf2/sf3 文件';
   else if (st.sampleState === 'fallback') label = head + '采样不可用，合成器兜底';
   else if (st.sampleState === 'synth') label = head + '内置合成器';
   else label = head + '待触发加载';
@@ -1767,7 +1766,6 @@ export default {
   setTimbre(v) { return setTimbre(v); },
   listTimbres() { return listTimbres(); },
   getTimbre() { return getTimbre(); },
-  setSf2Bank(v) { return setSf2Bank(v); },
   __dbgDump() { return __dbgDump(); },   // 面板"导调试"按钮入口(对象方法→模块函数)
   setPianoVolume(v) { setPianoVolume(v); },
   setChromeHidden(v) { chromeHidden = !!v; },   // 录制/纯净模式：隐藏画布内的界面角标

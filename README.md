@@ -4,7 +4,7 @@
 
 一个网页版实时音高检测器：把麦克风音频逐帧分析成基频，喂给可插拔的 Canvas 动画模板，同时记录整条音高轨迹供回放、编辑和导出。
 
-**零构建、零打包器** —— 原生 ES Module 直接跑，没有 webpack/vite/tsc 任何一步。所有第三方资源（音源采样、ONNX 模型运行时、音频合成引擎）都在本地，不依赖 CDN，断网可用。
+**零构建、零打包器、零运行时依赖** —— 原生 ES Module 直接跑，没有 webpack/vite/tsc 任何一步，也不需要 `npm install`。所有第三方资源（TensorFlow.js 运行时、basic-pitch 模型、音源采样）都已入库随仓库分发，不依赖 CDN，断网可用。
 
 ---
 
@@ -12,8 +12,7 @@
 
 ### 音高检测
 
-- 四种基频检测内核，可热切换：**YIN（双阈值，默认）/ MPM / pYIN / SwiftF0**（ONNX 神经网络）
-- 内核路由按置信度自动回退：主内核在某些段落失效时切到备用内核，不会出现整段空白曲线
+- 三种基频检测内核，可热切换：**YIN（双阈值，默认）/ MPM / pYIN**
 - 八度误判由仲裁层处理 —— 多个候选频率互成 2 的幂时取低频，避免"唱着唱着跳高一个八度"
 - **门控只有一份实现**（`dsp/detect.mjs`）：实时检测与离线重算走完全相同的代码，不会出现"回放和实时结果对不上"
 
@@ -39,7 +38,7 @@
 ### 钢琴块与琴声
 
 - 音高曲线 → 钢琴块，**三档出块算法**：颗粒（谷切精细分块，默认）/ 经典（纯音高分段）/ HMM 序列（序列级最优解码，回声专用）
-- **29 种音色**回放，采样全部内置（约 800 个 mp3，随仓库分发），离线可用
+- **28 种音色**回放（27 种采样音色 + 内置合成器兜底），采样全部内置（约 800 个 mp3，随仓库分发），离线可用
 - 回声效果（包络谷切分 + 定案尾窗 + 段确认）
 - AI 转谱：音频 → 音符表（基于 basic-pitch，模型权重已内置）
 
@@ -63,15 +62,10 @@
 >  只是跑测试要更高的版本，别被 engines 误导。）
 
 ```bash
-npm install
 npm start
 ```
 
-不用 npm 也可以：`npm start` 就是 `node server.mjs`。`npm install` 装的是检测内核之一所需的 ONNX 运行时（`onnxruntime-web`）和音频合成引擎（`spessasynth_lib`）。
-
-> 依赖里还有两个**当前没有任何代码使用**的项，属历史遗留：`three`（只剩 `index.html` 的 importmap
-> 和两个测试里的重定向桩还提到它）与 `onnxruntime-node`（devDependency，全仓无 import）。
-> 清理它们要动安装面，故先在这里记一笔。
+也可以直接 `node server.mjs`（`npm start` 就是它）。**本仓库无任何 npm 依赖**，不需要 `npm install`——三方运行时与模型都已入库。
 
 浏览器打开 <http://localhost:8000>，点「允许」授予麦克风权限。
 
@@ -115,7 +109,7 @@ anim/              动画模板 + registry + 琴声引擎（pitchTrail / pianoBl
 proj/              存档序列化、导入导出、PCM 分块、WebM 时长修复（旧 IndexedDB 代码只剩一次性迁移用）
 test/              测试（全部 node 直跑）
 demo/              内置示范曲 MIDI
-vendor/            第三方资产（basic-pitch 补丁版与模型权重、TensorFlow.js 运行时、SwiftF0 模型、SpessaSynth worklet、音源采样）
+vendor/            第三方资产（basic-pitch 补丁版与模型权重、TensorFlow.js 运行时、音源采样）
 tools/             构建辅助脚本（图标生成、按端口停服）
 archives/          存档真相源：每条存档一个 .ydyi 文件（不入库）
 samples/           本地测试音频素材（不入库）
@@ -139,14 +133,12 @@ logs/              本地日志与调试导出（不入库）
 |---|---|---|
 | `vendor/basic-pitch/` | Google Magenta basic-pitch | Apache-2.0；此处为打了本地化补丁的 4 个源文件 + 随仓库分发的模型权重 |
 | `vendor/tfjs/` | TensorFlow.js | Apache-2.0；AI 转谱运行时的浏览器构建（`tf.min.js`） |
-| `vendor/swiftf0/` | SwiftF0（lars76/swift-f0） | MIT；基频检测内核的 ONNX 模型（388KB） |
-| `vendor/spessasynth/` | spessasynth_lib | AudioWorklet 处理器（浏览器 `addModule` 需独立 URL，故拷入 vendor） |
 | `vendor/soundfonts/FluidR3_GM/` | FluidR3 GM SoundFont | 琴声采样 |
 | `vendor/soundfonts/salamander/` | Salamander Grand Piano | 琴声采样 |
 | `demo/*.mid` | 东方 Project 同人编曲 + 古典曲目 | 仅作功能示范 |
 
 AI 转谱需要的两个大文件随仓库分发（basic-pitch 模型权重 + `vendor/tfjs/tf.min.js`，约 2.3MB），开箱即用；
-`app.mjs` 中 `aiTranscribe` 附近的恢复说明只在文件被删时才用得上。SwiftF0 的 `model.onnx`（388KB）同样已入库。
+`app.mjs` 中 `aiTranscribe` 附近的恢复说明只在文件被删时才用得上。
 
 ---
 

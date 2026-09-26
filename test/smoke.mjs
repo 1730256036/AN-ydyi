@@ -1,26 +1,5 @@
 // 冒烟测试：给 app.mjs 打桩浏览器 API，验证模块初始化 + 一次 drawFrame/tick 不抛异常
 // node 运行（不真跑浏览器，仅抓初始化/渲染逻辑的运行时错）
-import { registerHooks } from 'node:module';
-import { pathToFileURL } from 'node:url';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
-
-// ---- three 裸导入重定向到本地 node_modules（浏览器端由 importmap 解析）----
-const ROOT = dirname(fileURLToPath(import.meta.url)) + '/..';
-const THREE_MAIN = pathToFileURL(join(ROOT, 'node_modules/three/build/three.module.js')).href;
-const THREE_ADDONS = pathToFileURL(join(ROOT, 'node_modules/three/examples/jsm/')).href;
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (specifier === 'three') {
-      return { url: THREE_MAIN, shortCircuit: true };
-    }
-    if (specifier.startsWith('three/addons/')) {
-      return { url: THREE_ADDONS + specifier.slice('three/addons/'.length), shortCircuit: true };
-    }
-    return nextResolve(specifier, context);
-  },
-});
-
 // ---- 先建 stub 2D context（接收任意方法调用）----
 function ctxStub() {
   return new Proxy({}, {

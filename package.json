@@ -6,17 +6,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node test/core-check.mjs && node test/smf-roundtrip.mjs && node test/mpm-sim.mjs && node test/pyin-sim.mjs && node test/swift-timeline.mjs && node test/kernels-sim.mjs && node test/gate-sim.mjs && node test/outlier-sim.mjs && node test/kernel-equiv.mjs && node test/stretch.mjs && node test/agg-sim.mjs && node test/piano-blocks-seg.mjs && node test/notes-hmm.mjs && node test/echo-hmm.mjs && node test/anim-smoke.mjs && node test/trail-smooth.mjs && node test/trail-feian.mjs && node test/trail-fx.mjs && node test/trail-body.mjs && node test/timbre-table.mjs && node test/demo-songs.mjs && node test/project-archive.mjs && node test/exporters.mjs && node test/mirror-name.mjs && node test/pcm-chunks.mjs && node test/echo.mjs && node test/capture.mjs && node test/library.mjs && node test/library-safety.mjs && node test/logpanel.mjs && node test/player.mjs && node test/proj-panel.mjs && node test/proj-feedback.mjs && node test/audio.mjs && node test/webm-duration.mjs && node test/pwa.mjs && node test/cap-record.mjs && node test/app-rec-machine.mjs && node test/app-player.mjs && node test/app-buttons.mjs && node test/scope-guards.mjs && node test/log-smoke.mjs && node test/smoke.mjs"
+    "test": "node test/core-check.mjs && node test/smf-roundtrip.mjs && node test/mpm-sim.mjs && node test/pyin-sim.mjs && node test/kernels-sim.mjs && node test/gate-sim.mjs && node test/outlier-sim.mjs && node test/kernel-equiv.mjs && node test/stretch.mjs && node test/agg-sim.mjs && node test/piano-blocks-seg.mjs && node test/notes-hmm.mjs && node test/echo-hmm.mjs && node test/anim-smoke.mjs && node test/trail-smooth.mjs && node test/trail-feian.mjs && node test/trail-fx.mjs && node test/trail-body.mjs && node test/timbre-table.mjs && node test/demo-songs.mjs && node test/project-archive.mjs && node test/exporters.mjs && node test/mirror-name.mjs && node test/pcm-chunks.mjs && node test/echo.mjs && node test/capture.mjs && node test/library.mjs && node test/library-safety.mjs && node test/logpanel.mjs && node test/player.mjs && node test/proj-panel.mjs && node test/proj-feedback.mjs && node test/audio.mjs && node test/webm-duration.mjs && node test/pwa.mjs && node test/cap-record.mjs && node test/app-rec-machine.mjs && node test/app-player.mjs && node test/app-buttons.mjs && node test/scope-guards.mjs && node test/log-smoke.mjs && node test/smoke.mjs"
   },
   "engines": {
     "node": ">=18"
-  },
-  "dependencies": {
-    "onnxruntime-web": "^1.29.0",
-    "spessasynth_lib": "^4.3.14",
-    "three": "^0.185.1"
-  },
-  "devDependencies": {
-    "onnxruntime-node": "^1.29.0"
   }
 }
