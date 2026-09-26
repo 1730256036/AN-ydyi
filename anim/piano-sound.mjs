@@ -184,7 +184,12 @@ export function ensureAudio() {
       const comp = actx.createDynamicsCompressor();
       comp.threshold.value = -10; comp.knee.value = 12; comp.ratio.value = 6;
       comp.attack.value = 0.004; comp.release.value = 0.18;
-      master.connect(comp); comp.connect(actx.destination);
+      // 音量级接在压限器【之后】：压限器只管防爆音（阈值/比率/拐点等参数一律不动），
+      // 音量滑块负责最终输出增益。若反过来接（音量在压限器之前），压限器会把 100%~150%
+      // 这段增益全额吃掉——单音进压限器已达 -1.4dB、阈值却是 -10dB，早已深度压缩，
+      // 调到 150% 输出也只涨 0.02dB，耳朵听不出（这就是"100→150%没效果"的原因）。
+      // 顺带：getOutputNode() 返回的 master 现在是压限后的最终输出，录屏桥接与实际听到一致。
+      comp.connect(master); master.connect(actx.destination);
     } catch (e) { slotOf(cur).state = 'fallback'; return; }
   }
   if (actx.state === 'suspended') actx.resume().catch(() => {});
