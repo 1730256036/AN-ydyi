@@ -2,6 +2,9 @@
 // ydyi 本地静态服务器 —— 零依赖。因 Web Audio getUserMedia 需 secure context(https 或 localhost)，
 // 用 http://localhost 提供。启动后在浏览器打开 http://localhost:8000
 //
+// ⚠ 只绑 127.0.0.1（仅本机可访问）：/api/archives 增删读列四个接口都没有鉴权，
+//   绑到所有网卡等于把 archives/ 整个对同局域网敞开。改这里请同步 test/pwa.mjs 的守卫。
+//
 // 2026-09-19 起兼管存档文件夹镜像：/api/archives 增删读列四个接口。
 // 本进程是真本机程序，有完整文件权限 → 前端存档时 fetch 一下，
 // .ydyi 就静默落到 ROOT/archives/ 里（资源管理器直接可见可拷走）。
@@ -250,9 +253,9 @@ async function main() {
     console.log('  ⚠ 端口 ' + PORT + ' 不可用，本次改用 ' + port + '（功能完全相同，旧端口上的服务与本页无关）');
   }
 
-  server.listen(port, () => {
+  server.listen(port, '127.0.0.1', () => {
     const url = 'http://localhost:' + port;
-    console.log(`\n  AN-ydyi 音域音调仪\n  ${url}\n  存档文件夹: ${ARCHIVE_DIR}\n  (关闭本窗口或 Ctrl+C = 停止服务)\n`);
+    console.log(`\n  AN-ydyi 音域音调仪\n  ${url}\n  存档文件夹: ${ARCHIVE_DIR}\n  (仅本机可访问；关闭本窗口或 Ctrl+C = 停止服务)\n`);
     openBrowser(url);
   });
 }

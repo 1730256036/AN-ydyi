@@ -7,7 +7,8 @@
 //   ② icons 声明的每个文件真实存在、是合法 PNG、且像素尺寸与声明一致
 //      （声明 192 实际 180 会被 Chrome 判为无效图标 → 静默不可安装）
 //   ③ index.html 真的引用了 manifest（引错路径等于没加）
-//   ④ server.mjs 能正确给出 .webmanifest 的 MIME（octet-stream 会被拒）
+//   ④ server.mjs 能正确给出 .webmanifest 的 MIME（octet-stream 会被拒），
+//      并且只绑 127.0.0.1（存档接口无鉴权，绑所有网卡 = 把 archives/ 对局域网敞开）
 //   ⑤ sw.js 存在且有版本化的缓存名（否则升级后永远吃旧缓存）
 // ============================================================
 import { readFileSync, existsSync, statSync } from 'node:fs';
@@ -81,10 +82,15 @@ if (mf) {
     /<link[^>]+rel=["']apple-touch-icon["'][^>]+href=["']\.\/icon-\d+\.png["']/.test(html));
 }
 
-// ④ server.mjs MIME
+// ④ server.mjs MIME + 监听地址
 {
   const srv = readFileSync(R('server.mjs'), 'utf8');
   ck('server.mjs 给 .webmanifest 配了 manifest+json MIME', /\.webmanifest['"]\s*:\s*['"]application\/manifest\+json/.test(srv));
+  // ★ 隐私红线：存档接口（GET/PUT/DELETE /api/archives）没有任何鉴权，
+  //   一旦 server.listen 漏写 host 参数，Node 会默认绑到所有网卡 → 同局域网
+  //   任何设备都能读/删/覆盖 archives/。这条守卫就是这个坑的钉子。
+  ck('★server.mjs 只绑 127.0.0.1（不写 host 会绑所有网卡，等于把存档敞开给局域网）',
+    /server\.listen\(\s*port\s*,\s*['"]127\.0\.0\.1['"]/.test(srv));
 }
 
 // ⑤ sw.js
