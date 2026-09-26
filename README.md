@@ -104,24 +104,26 @@ logs/              本地日志与调试导出（不入库）
 
 | 路径 | 来源 | 许可 | 说明 |
 |---|---|---|---|
-| `vendor/basic-pitch/` | Spotify [basic-pitch](https://github.com/spotify/basic-pitch) v1.0.1 | Apache-2.0 | 4 个 ESM 源文件 + 预训练模型权重；**源文件已作本地化修改**，见目录内 `NOTICE.md` |
+| `vendor/basic-pitch/` | Spotify [basic-pitch](https://github.com/spotify/basic-pitch) v1.0.1 | Apache-2.0 | 4 个 ESM 源文件 + 预训练模型权重；**其中 2 个源文件已作本地化修改**，改动清单与上游 NOTICE 见目录内 `NOTICE.md` |
 | `vendor/tfjs/` | [TensorFlow.js](https://github.com/tensorflow/tfjs)（Google） | Apache-2.0 | AI 转谱的浏览器构建 `tf.min.js`（文件内保留原始版权头） |
-| `vendor/soundfonts/FluidR3_GM/` | FluidR3 GM SoundFont，经 [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts) 预渲染 | **CC-BY 3.0** | 琴声采样（mp3） |
+| `vendor/soundfonts/FluidR3_GM/` | FluidR3 GM SoundFont — 音源本体 by **Frank Wen**，经 [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts) 预渲染为 mp3 | 上游 MIT ／ 所用 mp3 版声明 CC-BY 3.0 | 琴声采样 |
 | `vendor/soundfonts/salamander/` | **Salamander Grand Piano V3**，by Alexander Holm | **CC-BY 3.0** | 琴声采样（mp3） |
 | `demo/*.mid` | 东方 Project 同人编曲 + 古典曲目 | 未标明 | 仅作功能示范 |
 
-Apache-2.0 与 CC-BY 3.0 的**许可全文**分别随附在各自目录下的 `LICENSE` 文件中。
+Apache-2.0 的许可全文随附在 `vendor/basic-pitch/LICENSE` 与 `vendor/tfjs/LICENSE`。
 
-### CC-BY 3.0 署名
+### 音源采样的署名
 
-以下音源采样依 **Creative Commons Attribution 3.0 Unported（CC BY 3.0）** 授权，
-署名是该许可的强制要求（署名不代表原作者对本项目的认可或背书）：
+`vendor/soundfonts/` 下两类采样的**完整署名与许可声明全文**见该目录的 [`CREDITS.md`](vendor/soundfonts/CREDITS.md)。
+要点（署名是 CC-BY 3.0 的强制义务，且不得暗示原作者背书）：
 
-- **Salamander Grand Piano V3** — by **Alexander Holm**（SFZ 实现：kinwie）。
+- **Salamander Grand Piano V3** — by **Alexander Holm**（SFZ 实现：kinwie），**CC-BY 3.0**。
   本项目将其采样转换为 mp3 以便浏览器播放。原作品：<https://archive.org/details/SalamanderGrandPianoV3>
-- **FluidR3 GM SoundFont** — 经 <https://github.com/gleitz/midi-js-soundfonts> 预渲染为 mp3。
+- **FluidR3 GM** — 上游音源 `FluidR3_GM.sf2` by **Frank Wen**（**MIT**）；
+  本项目所用 mp3 取自 <https://github.com/gleitz/midi-js-soundfonts>，该仓库将其声明为 **CC-BY 3.0**。
+  两个许可都要求保留 Frank Wen 的版权与许可声明（全文见 `CREDITS.md`）。
 
-许可全文：<https://creativecommons.org/licenses/by/3.0/>
+CC-BY 3.0 许可全文：<https://creativecommons.org/licenses/by/3.0/>
 
 AI 转谱需要的两个大文件随仓库分发（basic-pitch 模型权重 + `vendor/tfjs/tf.min.js`，约 2.3MB），开箱即用；
 `app.mjs` 中 `aiTranscribe` 附近的恢复说明只在文件被删时才用得上。

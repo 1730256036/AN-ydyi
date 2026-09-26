@@ -1,3 +1,12 @@
+/* ==========================================================================
+ * 本文件取自 @spotify/basic-pitch v1.0.1 的 esm/toMidi.js，并【已修改】：
+ *   移除了对 @tonejs/midi 的依赖（原 `import { Midi } from '@tonejs/midi'`
+ *   改为下面的 `const Midi = null`）——generateFileData 不被本项目使用，
+ *   砍掉该依赖以保持零构建。
+ * 上游：Copyright 2022 Spotify AB，Apache License 2.0（见同目录 LICENSE）。
+ * 修改详情见同目录 NOTICE.md（依 Apache-2.0 第 4(b) 条作显著标注）。
+ * ⚠️ 若按 app.mjs 注释里的 CDN 命令重下本文件，此声明会丢失，需重新补上。
+ * ========================================================================== */
 const Midi = null; // 本地化：generateFileData 不被 ydyi 使用，砍掉 @tonejs/midi 依赖
 const MIDI_OFFSET = 21;
 const AUDIO_SAMPLE_RATE = 22050;

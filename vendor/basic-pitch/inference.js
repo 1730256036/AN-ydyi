@@ -1,3 +1,11 @@
+/* ==========================================================================
+ * 本文件取自 @spotify/basic-pitch v1.0.1 的 esm/inference.js，并【已修改】：
+ *   第 1 行的 `import * as tf from '@tensorflow/tfjs'` 已改为指向本地桥
+ *   `../../dsp/bp-tf-proxy.mjs`（本项目零构建，浏览器原生 ESM 无法解析裸模块说明符）。
+ * 上游：Copyright 2022 Spotify AB，Apache License 2.0（见同目录 LICENSE）。
+ * 修改详情见同目录 NOTICE.md（依 Apache-2.0 第 4(b) 条作显著标注）。
+ * ⚠️ 若按 app.mjs 注释里的 CDN 命令重下本文件，此声明会丢失，需重新补上。
+ * ========================================================================== */
 import * as tf from '../../dsp/bp-tf-proxy.mjs';
 const OUTPUT_TO_TENSOR_NAME = {
     contours: 'Identity',
