@@ -5,6 +5,9 @@ node_modules/
 .DS_Store
 Thumbs.db
 
+# WorkBuddy 本地记忆/工作日志（agent 开发记录，本机私有，不与他人共享，不进版本管理）
+.workbuddy/
+
 # 音频：只放行内置示范曲（曲库功能依赖它们），其余音频一律不入库
 *.mid
 !demo/*.mid
