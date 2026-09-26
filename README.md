@@ -54,12 +54,7 @@
 
 ## 快速开始
 
-需要 **Node.js 22.15+**。
-
-> 只跑服务本身（`node server.mjs`）Node 18+ 就够；但 `npm test` 整条测试链需要 **Node 22.15+**——
-> `test/smoke.mjs` 与 `test/cap-record.mjs` 用了 `node:module` 的 `registerHooks`，那是 22.15 才有的 API。
-> （`package.json` 的 `engines` 仍写 `>=18`，因为"能跑应用"这条门槛确实只有 18；
->  只是跑测试要更高的版本，别被 engines 误导。）
+需要 **Node.js 18+**。
 
 ```bash
 npm start
@@ -74,28 +69,6 @@ npm start
 端口默认 8000，可用环境变量改：`PORT=9000 npm start`
 
 浏览器建议用 Chrome / Edge（依赖 AudioWorklet、Web Audio、IndexedDB）。
-
----
-
-## 测试
-
-```bash
-npm test        # 43 个脚本，全部通过
-```
-
-`npm test` 就是 `package.json` 里 `test` 字段那条 `node xxx.mjs && node yyy.mjs && …` 的长链，没有测试框架，也可以单独挑一个直接跑。
-测试**全部是 node 直跑**，不需要浏览器、不需要起服务。做法是用一套极简 DOM 桩驱动 `app.mjs`：装桩 → import 模块 → 模拟点击与哈希对比。因此有一条硬约束：**`app.mjs` 模块顶层立即执行的代码里，不许引入桩还没模拟的新 DOM API**，否则整条测试链会红。
-
-测试覆盖：检测算法仿真、内核等价比对、变速不变调（拉伸后仍由 YIN 量回原频率）、门控行为、SMF 往返、存档读写、音频路由、动画模板冒烟、PWA、控件作用域不变量等。
-
-另有几个手工工具**不进测试链**（依赖本地素材、耗时数秒），需要时手动跑：
-
-```bash
-node test/seg-ab.mjs                 # 钢琴块分段 A/B 对比（默认读 samples/ 下的录音）
-node test/bench-real.mjs             # 真实录音与参照 MIDI 的一致性基准
-node test/tongue-diag.mjs <录音.wav>  # 单段录音的逐帧诊断
-node test/kb-preview.mjs             # 键盘半音格预览
-```
 
 ---
 
@@ -154,3 +127,24 @@ AI 转谱需要的两个大文件随仓库分发（basic-pitch 模型权重 + `v
 ## 项目状态
 
 个人项目，仍在持续调整中。检测参数、动画模板和交互细节都经过真实录音的反复校准。
+
+---
+
+## 开发与测试
+
+改代码的人可以跑一遍回归链，也可以单个跑：
+
+```bash
+npm test                 # 42 个脚本串行跑完，node 直跑，不需要浏览器或起服务
+node test/xxx.mjs        # 挑一个单独跑
+```
+
+它用一套极简 DOM 桩驱动 `app.mjs`（装桩 → import 模块 → 模拟点击与哈希对比），因此有一条硬约束：
+**`app.mjs` 顶层立即执行的代码里，不许引入桩还没模拟的新 DOM API**，否则整条链会红。
+
+另有几个不进链的手工工具（依赖本地素材、耗时数秒），需要时手动跑：
+`test/seg-ab.mjs`（钢琴块分段 A/B）、`test/bench-real.mjs`（真实录音与参照 MIDI 基准）、
+`test/tongue-diag.mjs <录音.wav>`（逐帧诊断）、`test/kb-preview.mjs`（键盘半音格预览）。
+
+跑测试需要 **Node.js 22.15+**（`test/smoke.mjs`、`test/cap-record.mjs` 用了 `node:module` 的 `registerHooks`）；
+只跑应用 18+ 就够 —— `package.json` 的 `engines` 写 `>=18` 正是这个原因，别被它误导。
